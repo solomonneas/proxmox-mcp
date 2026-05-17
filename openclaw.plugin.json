@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "proxmox",
   "name": "Proxmox",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Proxmox VE read/write tools: status, containers, VMs, backups, lifecycle, snapshots.",
   "entry": "./dist/index.js",
   "activation": { "onStartup": true },
