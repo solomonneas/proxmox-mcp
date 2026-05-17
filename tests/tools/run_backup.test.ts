@@ -60,8 +60,9 @@ describe("proxmox_run_backup", () => {
     expect(payload.upid).toBe("UPID:pve:00007:vzdump");
     const postReq = fake.requests.find((q) => q.method === "POST");
     expect(postReq?.path).toBe("/api2/json/nodes/pve/vzdump");
-    expect(JSON.parse(postReq?.body ?? "{}")).toEqual({
-      vmid: 100,
+    expect(postReq?.contentType).toBe("application/x-www-form-urlencoded");
+    expect(Object.fromEntries(new URLSearchParams(postReq?.body ?? ""))).toEqual({
+      vmid: "100",
       storage: "local",
       mode: "snapshot",
       compress: "zstd",
@@ -91,8 +92,8 @@ describe("proxmox_run_backup", () => {
       confirm: true,
     });
     const postReq = fake.requests.find((q) => q.method === "POST");
-    expect(JSON.parse(postReq?.body ?? "{}")).toEqual({
-      vmid: 110,
+    expect(Object.fromEntries(new URLSearchParams(postReq?.body ?? ""))).toEqual({
+      vmid: "110",
       storage: "nas-backup",
       mode: "stop",
       compress: "zstd",

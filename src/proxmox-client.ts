@@ -55,8 +55,19 @@ export class ProxmoxClient {
     const headers: Record<string, string> = { authorization: this.authHeader };
     let bodyStr: string | undefined;
     if (body !== undefined) {
-      headers["content-type"] = "application/json";
-      bodyStr = JSON.stringify(body);
+      // PVE API rejects application/json on POST/PUT - it requires form-encoded bodies.
+      if (body && typeof body === "object" && !Array.isArray(body)) {
+        const form = new URLSearchParams();
+        for (const [k, v] of Object.entries(body as Record<string, unknown>)) {
+          if (v === undefined || v === null) continue;
+          form.append(k, typeof v === "object" ? JSON.stringify(v) : String(v));
+        }
+        headers["content-type"] = "application/x-www-form-urlencoded";
+        bodyStr = form.toString();
+      } else {
+        headers["content-type"] = "application/json";
+        bodyStr = JSON.stringify(body);
+      }
     }
     let lastErr: unknown;
     for (let attempt = 0; attempt < 2; attempt++) {

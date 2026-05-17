@@ -5,6 +5,7 @@ export interface CapturedRequest {
   method: string;
   path: string;
   authHeader: string | null;
+  contentType: string | null;
   body: string;
 }
 
@@ -39,6 +40,7 @@ export async function startFakeProxmox(routes: FakeRoute[] = []): Promise<FakePr
         method: req.method ?? "GET",
         path: req.url ?? "/",
         authHeader: req.headers.authorization ?? null,
+        contentType: req.headers["content-type"] ?? null,
         body,
       });
       const route = fake.routes.find((r) => r.method === req.method && r.path === req.url);

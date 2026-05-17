@@ -59,7 +59,8 @@ describe("proxmox_snapshot_resource", () => {
     expect(payload.upid).toBe("UPID:pve:00005:snap");
     const postReq = fake.requests.find((q) => q.method === "POST");
     expect(postReq?.path).toBe("/api2/json/nodes/pve/qemu/110/snapshot");
-    expect(JSON.parse(postReq?.body ?? "{}")).toEqual({
+    expect(postReq?.contentType).toBe("application/x-www-form-urlencoded");
+    expect(Object.fromEntries(new URLSearchParams(postReq?.body ?? ""))).toEqual({
       snapname: "pre-upgrade",
       description: "before kernel bump",
     });
@@ -83,6 +84,6 @@ describe("proxmox_snapshot_resource", () => {
     const tool = makeTool();
     await tool.execute("test", { vmid: 100, snapname: "clean", confirm: true });
     const postReq = fake.requests.find((q) => q.method === "POST");
-    expect(JSON.parse(postReq?.body ?? "{}")).toEqual({ snapname: "clean" });
+    expect(Object.fromEntries(new URLSearchParams(postReq?.body ?? ""))).toEqual({ snapname: "clean" });
   });
 });

@@ -52,7 +52,8 @@ describe("proxmox_stop_resource", () => {
     expect(payload.upid).toBe("UPID:pve:00002:stop");
     const postReq = fake.requests.find((q) => q.method === "POST");
     expect(postReq?.path).toBe("/api2/json/nodes/pve/qemu/110/status/shutdown");
-    expect(JSON.parse(postReq?.body ?? "{}")).toEqual({});
+    expect(postReq?.contentType).toBe("application/x-www-form-urlencoded");
+    expect(postReq?.body).toBe("");
   });
 
   it("includes timeout in body when timeoutSeconds is passed", async () => {
@@ -73,6 +74,6 @@ describe("proxmox_stop_resource", () => {
     const tool = makeTool();
     await tool.execute("test", { vmid: 110, confirm: true, timeoutSeconds: 60 });
     const postReq = fake.requests.find((q) => q.method === "POST");
-    expect(JSON.parse(postReq?.body ?? "{}")).toEqual({ timeout: 60 });
+    expect(Object.fromEntries(new URLSearchParams(postReq?.body ?? ""))).toEqual({ timeout: "60" });
   });
 });
