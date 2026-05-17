@@ -893,7 +893,7 @@ git commit -m "feat(server): MCP entry + OpenClaw plugin + 12-tool registration"
 
 README mirrors adguard-mcp's structure: tool table, configuration table, install, 5-client setup blocks (Claude Desktop / Claude Code / OpenClaw / Hermes Agent / Codex CLI), safety section.
 
-Generic example values throughout (use `192.168.1.10` / `https://pve.example.local:8006`, never the actual `192.0.2.10` proxmox-host IP).
+Generic example values throughout (use `192.168.1.10` / `https://pve.example.local:8006`, never the operator's actual home-network IP).
 
 Commit:
 

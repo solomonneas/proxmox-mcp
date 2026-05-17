@@ -6,7 +6,7 @@ Mirrors the proven pattern of `solomonneas/adguard-mcp` and `solomonneas/postiz-
 
 ## Problem
 
-The home stack runs on Proxmox. One host (proxmox-host), 9 containers + 1 VM as of 2026-05-17 (adguard, twingate, crafty, homarr, wazuh, social-automation, immich, openclaw-prbuild, secondary-host VM, etc.). Day-to-day touchpoints are repetitive but mostly read-only: check container status before a deploy, peek at recent task logs after an upgrade, confirm a backup ran, restart a container after a config change.
+The home stack runs on Proxmox. One host (the Proxmox host), 9 containers + 1 VM as of 2026-05-17 (adguard, twingate, crafty, homarr, wazuh, social-automation, immich, openclaw-prbuild, secondary-host VM, etc.). Day-to-day touchpoints are repetitive but mostly read-only: check container status before a deploy, peek at recent task logs after an upgrade, confirm a backup ran, restart a container after a config change.
 
 Today the operator either opens the web UI at `https://<host>:8006/` (slow, click-heavy) or SSHes in and runs `pct list`, `qm list`, `pct exec`, `pvesm status`. Neither composes with Claude conversation. "Restart wazuh" or "show me CT 109 status" should be one sentence, not a tab switch.
 
@@ -111,7 +111,7 @@ Resources are addressed by `vmid` only - the tool figures out which node + type 
 Proxmox API tokens. The operator creates one in the web UI under Datacenter -> API Tokens, then sets:
 
 ```
-PROXMOX_URL=https://proxmox-host.local:8006
+PROXMOX_URL=https://pve.example.local:8006
 PROXMOX_TOKEN_ID=claude@pam!api-token-1
 PROXMOX_TOKEN_SECRET=<uuid>
 PROXMOX_TLS_INSECURE=true                     # default false; toggle for self-signed
@@ -207,4 +207,4 @@ PR ships code + docs + tests. Operator owns:
 - Publish flow: `[[clawhub-cli-publish-flow]]` (and the lesson: include openclaw block on day one).
 - Build-but-don't-flip: `[[feedback-build-but-dont-flip-preference]]`.
 - README requirements: `[[feedback-mcp-readme-five-clients]]`.
-- Home stack inventory: workspace memory cards covering proxmox-host (CT inventory) and the per-container roles.
+- Home stack inventory: workspace memory cards covering the Proxmox host (CT inventory) and the per-container roles.
