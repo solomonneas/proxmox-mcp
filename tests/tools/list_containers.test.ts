@@ -14,12 +14,13 @@ describe("proxmox_list_containers", () => {
     fake = await startFakeProxmox([
       {
         method: "GET",
-        path: "/api2/json/cluster/resources?type=lxc",
+        path: "/api2/json/cluster/resources?type=vm",
         status: 200,
         body: {
           data: [
             { vmid: 100, name: "web-svc", node: "pve", status: "running", type: "lxc" },
             { vmid: 105, name: "db-svc", node: "pve", status: "running", type: "lxc" },
+            { vmid: 200, name: "app-vm", node: "pve", status: "running", type: "qemu" },
           ],
         },
       },
@@ -38,5 +39,6 @@ describe("proxmox_list_containers", () => {
     expect(payload.count).toBe(2);
     expect(payload.containers).toHaveLength(2);
     expect(payload.containers[0].vmid).toBe(100);
+    expect(payload.containers.every((c: { type: string }) => c.type === "lxc")).toBe(true);
   });
 });

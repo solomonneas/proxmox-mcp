@@ -21,11 +21,12 @@ export function createProxmoxListContainersTool(getClient: ClientFactory) {
     name: "proxmox_list_containers",
     label: "proxmox: list containers",
     description:
-      "List every LXC container across the cluster (vmid, name, node, status, CPU/mem) via GET /cluster/resources?type=lxc.",
+      "List every LXC container across the cluster (vmid, name, node, status, CPU/mem) via GET /cluster/resources?type=vm filtered client-side to type=lxc.",
     parameters: Schema,
     execute: async () => {
       const client = getClient();
-      const containers = await client.get<ContainerResource[]>("/cluster/resources?type=lxc");
+      const all = await client.get<Array<ContainerResource & { type: string }>>("/cluster/resources?type=vm");
+      const containers = all.filter((r) => r.type === "lxc");
       return jsonToolResult({ count: containers.length, containers });
     },
   };
