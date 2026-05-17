@@ -28,11 +28,18 @@ const tools = [
   toolFactories.createProxmoxRunBackupTool(getClient),
   toolFactories.createProxmoxGetTaskStatusTool(getClient),
   toolFactories.createProxmoxGetTaskLogTool(getClient),
+  toolFactories.createProxmoxListTemplatesTool(getClient),
+  toolFactories.createProxmoxCreateContainerTool(getClient),
+  toolFactories.createProxmoxCreateVmTool(getClient),
+  toolFactories.createProxmoxCloneResourceTool(getClient),
+  toolFactories.createProxmoxDestroyResourceTool(getClient),
+  toolFactories.createProxmoxDeleteSnapshotTool(getClient),
+  toolFactories.createProxmoxForceStopResourceTool(getClient),
 ];
 
 const toolMap = new Map(tools.map((t) => [t.name, t]));
 
-const server = new Server({ name: "proxmox-mcp", version: "0.2.0" }, { capabilities: { tools: {} } });
+const server = new Server({ name: "proxmox-mcp", version: "0.3.0" }, { capabilities: { tools: {} } });
 
 server.setRequestHandler(ListToolsRequestSchema, async () => ({
   tools: tools.map((t) => ({ name: t.name, description: t.description, inputSchema: t.parameters })),

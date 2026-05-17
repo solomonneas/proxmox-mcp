@@ -61,5 +61,12 @@ export default definePluginEntry({
     register(tools.createProxmoxRunBackupTool(getClient));
     register(tools.createProxmoxGetTaskStatusTool(getClient));
     register(tools.createProxmoxGetTaskLogTool(getClient));
+    register(tools.createProxmoxListTemplatesTool(getClient));
+    register(tools.createProxmoxCreateContainerTool(getClient));
+    register(tools.createProxmoxCreateVmTool(getClient));
+    register(tools.createProxmoxCloneResourceTool(getClient));
+    register(tools.createProxmoxDestroyResourceTool(getClient));
+    register(tools.createProxmoxDeleteSnapshotTool(getClient));
+    register(tools.createProxmoxForceStopResourceTool(getClient));
   },
 });

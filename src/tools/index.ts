@@ -12,3 +12,10 @@ export { createProxmoxSnapshotResourceTool } from "./proxmox_snapshot_resource.t
 export { createProxmoxRunBackupTool } from "./proxmox_run_backup.ts";
 export { createProxmoxGetTaskStatusTool } from "./proxmox_get_task_status.ts";
 export { createProxmoxGetTaskLogTool } from "./proxmox_get_task_log.ts";
+export { createProxmoxListTemplatesTool } from "./proxmox_list_templates.ts";
+export { createProxmoxCreateContainerTool } from "./proxmox_create_container.ts";
+export { createProxmoxCreateVmTool } from "./proxmox_create_vm.ts";
+export { createProxmoxCloneResourceTool } from "./proxmox_clone_resource.ts";
+export { createProxmoxDestroyResourceTool } from "./proxmox_destroy_resource.ts";
+export { createProxmoxDeleteSnapshotTool } from "./proxmox_delete_snapshot.ts";
+export { createProxmoxForceStopResourceTool } from "./proxmox_force_stop_resource.ts";
