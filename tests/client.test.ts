@@ -82,6 +82,15 @@ describe("ProxmoxClient", () => {
     expect(c.dispatcher).toBeUndefined();
   });
 
+  it("DELETE method uses correct HTTP verb", async () => {
+    fake = await startFakeProxmox([
+      { method: "DELETE", path: "/api2/json/nodes/pve/lxc/100", status: 200, body: { data: "UPID:..." } },
+    ]);
+    const c = new ProxmoxClient({ url: fake.baseUrl, tokenId: "u@pam!t", tokenSecret: "s", tlsInsecure: false });
+    await c.delete("/nodes/pve/lxc/100");
+    expect(fake.requests[0].method).toBe("DELETE");
+  });
+
   it("does not leak token in thrown error messages", async () => {
     fake = await startFakeProxmox([
       { method: "GET", path: "/api2/json/version", status: 401, body: { message: "unauthorized" } },
