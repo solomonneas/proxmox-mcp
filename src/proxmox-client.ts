@@ -1,4 +1,4 @@
-import { Agent } from "node:https";
+import { Agent as UndiciAgent } from "undici";
 
 export interface ProxmoxClientOptions {
   retryDelayMs?: number;
@@ -28,17 +28,16 @@ export interface ClientInstanceConfig {
 export class ProxmoxClient {
   private authHeader: string;
   private retryDelayMs: number;
-  // TODO(v0.2): Node's global fetch (undici) ignores node:https.Agent. For real
-  // self-signed PVE hosts the TLS-insecure path should use undici.Agent
-  // ({ connect: { rejectUnauthorized: false } }) via the `dispatcher` init
-  // option. Tests use http://, so this path is not exercised in v0.1.
-  private agent?: Agent;
+  // Node's global fetch (undici) ignores node:https.Agent. To actually skip
+  // cert verification for self-signed PVE hosts we pass an undici Agent via
+  // the `dispatcher` init option.
+  dispatcher?: UndiciAgent;
 
   constructor(private cfg: ClientInstanceConfig, opts: ProxmoxClientOptions = {}) {
     this.authHeader = `PVEAPIToken=${cfg.tokenId}=${cfg.tokenSecret}`;
     this.retryDelayMs = opts.retryDelayMs ?? 1000;
     if (cfg.tlsInsecure && cfg.url.startsWith("https://")) {
-      this.agent = new Agent({ rejectUnauthorized: false });
+      this.dispatcher = new UndiciAgent({ connect: { rejectUnauthorized: false } });
     }
   }
 
@@ -72,8 +71,8 @@ export class ProxmoxClient {
     let lastErr: unknown;
     for (let attempt = 0; attempt < 2; attempt++) {
       try {
-        const init: RequestInit & { dispatcher?: unknown } = { method, headers, body: bodyStr };
-        if (this.agent) (init as Record<string, unknown>).agent = this.agent;
+        const init: Record<string, unknown> = { method, headers, body: bodyStr };
+        if (this.dispatcher) init.dispatcher = this.dispatcher;
         const res = await fetch(url, init as RequestInit);
         if (res.status >= 200 && res.status < 300) {
           const text = await res.text();

@@ -67,6 +67,21 @@ describe("ProxmoxClient", () => {
     expect(parsed.get("vmstate")).toBe("0");
   });
 
+  it("sets undici dispatcher when tlsInsecure:true on https url", () => {
+    const c = new ProxmoxClient({ url: "https://pve.example:8006", tokenId: "u@pam!t", tokenSecret: "s", tlsInsecure: true });
+    expect(c.dispatcher).toBeDefined();
+  });
+
+  it("does not set dispatcher when tlsInsecure:false", () => {
+    const c = new ProxmoxClient({ url: "https://pve.example:8006", tokenId: "u@pam!t", tokenSecret: "s", tlsInsecure: false });
+    expect(c.dispatcher).toBeUndefined();
+  });
+
+  it("does not set dispatcher for http:// even when tlsInsecure:true", () => {
+    const c = new ProxmoxClient({ url: "http://pve.example:8006", tokenId: "u@pam!t", tokenSecret: "s", tlsInsecure: true });
+    expect(c.dispatcher).toBeUndefined();
+  });
+
   it("does not leak token in thrown error messages", async () => {
     fake = await startFakeProxmox([
       { method: "GET", path: "/api2/json/version", status: 401, body: { message: "unauthorized" } },
