@@ -91,7 +91,6 @@ export function createProxmoxCreateVmTool(getClient: ClientFactory) {
         start: args.start ? 1 : 0,
       };
       if (typeof args.iso === "string" && args.iso.length > 0) {
-        body.cdrom = args.iso;
         body.ide2 = `${args.iso},media=cdrom`;
       }
       const upid = await client.post<string>(`/nodes/${node}/qemu`, body);

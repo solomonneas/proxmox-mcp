@@ -28,7 +28,7 @@ MCP server exposing Proxmox VE read + safe-write + destructive tools via API tok
 | `proxmox_get_task_status` | 1 read | Single UPID status lookup. |
 | `proxmox_get_task_log` | 1 read | Task log tail for a UPID. |
 
-**Reads (8):** open; no flags required.
+**Reads (10):** open; no flags required.
 **Safe writes (8):** require `confirm: true`. Schema documents the gate on every tool. `WriteGateError` fires before any HTTP call.
 **Destructive (3):** require `confirm: true` + `destructive: true` + env `PROXMOX_ENABLE_DESTRUCTIVE=1`. All three gates must be satisfied; any one missing throws `WriteGateError` before resolving the resource.
 

@@ -52,7 +52,9 @@ export function createProxmoxDestroyResourceTool(getClient: ClientFactory) {
         params.append("purge", "1");
         params.append("destroy-unreferenced-disks", "1");
       }
-      if (force) params.append("force", "1");
+      // PVE: `force` is documented on LXC destroy but not on QEMU destroy.
+      // Only emit it for LXC so QEMU rejects don't bounce on an unknown param.
+      if (force && type === "lxc") params.append("force", "1");
       const qs = params.toString();
       const path = qs.length > 0
         ? `/nodes/${node}/${type}/${args.vmid}?${qs}`
