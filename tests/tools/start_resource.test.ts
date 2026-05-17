@@ -54,4 +54,22 @@ describe("proxmox_start_resource", () => {
     const postReq = fake.requests.find((q) => q.method === "POST");
     expect(postReq?.path).toBe("/api2/json/nodes/pve/lxc/100/status/start");
   });
+
+  it("fails closed when cluster/resources reports the same vmid on multiple nodes", async () => {
+    fake = await startFakeProxmox([
+      {
+        method: "GET",
+        path: "/api2/json/cluster/resources",
+        status: 200,
+        body: {
+          data: [
+            { vmid: 100, node: "pve-a", type: "lxc" },
+            { vmid: 100, node: "pve-b", type: "lxc" },
+          ],
+        },
+      },
+    ]);
+    const tool = makeTool();
+    await expect(tool.execute("test", { vmid: 100, confirm: true })).rejects.toThrow(/ambiguous/);
+  });
 });
