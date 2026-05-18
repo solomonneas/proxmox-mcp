@@ -1,6 +1,14 @@
 import type { ProxmoxClient } from "../proxmox-client.ts";
+import type { ExecResult, SshHostConfig } from "../ssh-executor.ts";
 
 export type ClientFactory = () => ProxmoxClient;
+
+export interface SshExecutor {
+  execInLxc(vmid: number, command: string, timeoutMs: number, stdin?: string): Promise<ExecResult>;
+  execViaDirectSsh(targetCfg: SshHostConfig, command: string, timeoutMs: number, stdin?: string): Promise<ExecResult>;
+}
+
+export type SshExecutorFactory = () => SshExecutor;
 
 export function jsonToolResult(payload: unknown) {
   return {
