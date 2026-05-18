@@ -4,7 +4,9 @@
   "description": "MCP server exposing Proxmox VE read + safe-write tools",
   "type": "module",
   "openclaw": {
-    "extensions": ["./index.ts"],
+    "extensions": [
+      "./index.ts"
+    ],
     "compat": {
       "pluginApi": ">=2026.3.24-beta.2",
       "minGatewayVersion": "2026.3.24-beta.2"
@@ -14,7 +16,9 @@
       "pluginSdkVersion": "2026.5.17"
     }
   },
-  "bin": { "proxmox-mcp": "./dist/mcp-server.js" },
+  "bin": {
+    "proxmox-mcp": "./dist/mcp-server.js"
+  },
   "scripts": {
     "typecheck": "tsc --noEmit",
     "build": "tsup",
@@ -24,22 +28,40 @@
     "test:watch": "vitest",
     "prepublishOnly": "npm run typecheck && npm test && npm run build"
   },
-  "files": ["dist", "openclaw.plugin.json", "README.md", "LICENSE"],
+  "files": [
+    "dist",
+    "openclaw.plugin.json",
+    "README.md",
+    "LICENSE"
+  ],
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",
-    "@sinclair/typebox": "^0.34.0"
+    "@sinclair/typebox": "^0.34.0",
+    "ssh2": "^1.17.0"
   },
-  "peerDependencies": { "openclaw": "^2026.4.22" },
-  "peerDependenciesMeta": { "openclaw": { "optional": true } },
+  "peerDependencies": {
+    "openclaw": "^2026.4.22"
+  },
+  "peerDependenciesMeta": {
+    "openclaw": {
+      "optional": true
+    }
+  },
   "devDependencies": {
     "@types/node": "^25.6.2",
+    "@types/ssh2": "^1.15.5",
     "openclaw": "^2026.4.22",
     "tsup": "^8.4.0",
     "tsx": "^4.19.0",
     "typescript": "^6.0.3",
     "vitest": "^4.1.5"
   },
-  "engines": { "node": ">=20" },
+  "engines": {
+    "node": ">=20"
+  },
   "license": "MIT",
-  "repository": { "type": "git", "url": "https://github.com/solomonneas/proxmox-mcp" }
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/solomonneas/proxmox-mcp"
+  }
 }
