@@ -27,9 +27,12 @@ MCP server exposing Proxmox VE read + safe-write + destructive tools via API tok
 | `proxmox_force_stop_resource` | 3 destructive | Non-graceful hard stop of a running container or VM. |
 | `proxmox_get_task_status` | 1 read | Single UPID status lookup. |
 | `proxmox_get_task_log` | 1 read | Task log tail for a UPID. |
+| `proxmox_read_file` | 1 read | Read a file from inside an LXC or QEMU VM (SSH + `cat`). |
+| `proxmox_exec` | 2 safe-write | Run a shell command inside an LXC or QEMU VM. Returns stdout/stderr/exit_code. |
+| `proxmox_write_file` | 2 safe-write | Write a text file (with parent dirs) inside an LXC or QEMU VM. |
 
-**Reads (10):** open; no flags required.
-**Safe writes (8):** require `confirm: true`. Schema documents the gate on every tool. `WriteGateError` fires before any HTTP call.
+**Reads (11):** open; no flags required.
+**Safe writes (10):** require `confirm: true`. Schema documents the gate on every tool. `WriteGateError` fires before any HTTP call.
 **Destructive (3):** require `confirm: true` + `destructive: true` + env `PROXMOX_ENABLE_DESTRUCTIVE=1`. All three gates must be satisfied; any one missing throws `WriteGateError` before resolving the resource.
 
 ## Configuration
@@ -47,6 +50,27 @@ PROXMOX_TLS_INSECURE=false
 ```
 
 Trailing slashes on `PROXMOX_URL` are stripped. The token secret is registered with the redactor on startup and masked from all log + error output.
+
+### In-container exec env vars (v0.4)
+
+The `proxmox_exec`, `proxmox_read_file`, and `proxmox_write_file` tools SSH to the Proxmox host (for LXC, via `pct exec`) or directly to the VM (for QEMU). All are optional; defaults derive from `PROXMOX_URL`.
+
+| Env var | Default | Purpose |
+| --- | --- | --- |
+| `PROXMOX_SSH_HOST` | hostname from `PROXMOX_URL` | Proxmox host for `pct exec` |
+| `PROXMOX_SSH_PORT` | `22` | SSH port |
+| `PROXMOX_SSH_USER` | `root` | SSH user on Proxmox host |
+| `PROXMOX_SSH_KEY` | `~/.ssh/id_ed25519` | Key path for Proxmox host SSH |
+| `PROXMOX_VM_SSH_USER` | falls through to `PROXMOX_SSH_USER` | Default user for direct VM SSH |
+| `PROXMOX_VM_SSH_KEY` | falls through to `PROXMOX_SSH_KEY` | Default key for direct VM SSH |
+
+Per-VM overrides (read at execute time, no MCP restart needed):
+
+- `PROXMOX_VM_<vmid>_SSH_HOST` - pin a VM's IP (bypasses guest agent)
+- `PROXMOX_VM_<vmid>_SSH_USER` - per-VM user override
+- `PROXMOX_VM_<vmid>_SSH_KEY` - per-VM key override
+
+For QEMU VMs without a per-VM env override, install `qemu-guest-agent` in the VM and enable it with `qm set <vmid> --agent 1` so the IP can be discovered automatically.
 
 ## Install
 
@@ -146,8 +170,8 @@ PROXMOX_TLS_INSECURE = "false"
 
 This MCP uses the same three-tier write-gating pattern as the rest of the `solomonneas/*-mcp` family:
 
-- **Tier 1 (reads):** open. No confirm flag needed. Status, listings, usage, recent tasks, backup inventory, template inventory.
-- **Tier 2 (safe writes):** require an explicit `confirm: true` arg. The JSON schema documents this on every write tool. Start, stop, reboot, snapshot create, run backup, create container, create VM, clone live here. A hallucinated tool call without the confirm flag throws `WriteGateError` before any HTTP traffic.
+- **Tier 1 (reads):** open. No confirm flag needed. Status, listings, usage, recent tasks, backup inventory, template inventory, file reads from containers/VMs.
+- **Tier 2 (safe writes):** require an explicit `confirm: true` arg. The JSON schema documents this on every write tool. Start, stop, reboot, snapshot create, run backup, create container, create VM, clone, in-container `exec`, and in-container `write_file` live here. A hallucinated tool call without the confirm flag throws `WriteGateError` before any HTTP traffic.
 - **Tier 3 (destructive):** require `confirm: true` + `destructive: true` + the env flag `PROXMOX_ENABLE_DESTRUCTIVE=1` on the MCP process. Permanent resource deletion, snapshot deletion, and non-graceful force-stop live here.
 
 ### Destructive operations env gate
