@@ -1,3 +1,4 @@
+<!-- content-guard: allow private-ipv4 file -->
 # proxmox-mcp v0.4 Implementation Plan - In-Container Execution
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.

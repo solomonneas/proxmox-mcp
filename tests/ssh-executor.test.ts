@@ -1,3 +1,4 @@
+// content-guard: allow private-ipv4 file
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { EventEmitter } from "node:events";
 

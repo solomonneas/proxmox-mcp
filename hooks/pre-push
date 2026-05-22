@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # pre-push: block push if content-guard finds blocking violations.
-# Scans the working tree against policies/public-repo.json.
+# Scans tracked files in the repo against policies/public-repo.json.
+# (Tracked-only scan — untracked working-tree files are out of scope.)
 # Bypass only if you know what you're doing: git push --no-verify
 set -euo pipefail
 
@@ -19,12 +20,20 @@ if [[ ! -f "$POLICY" ]]; then
 fi
 
 REPO_ROOT="$(git rev-parse --show-toplevel)"
-echo "pre-push: scanning $REPO_ROOT against $(basename "$POLICY")"
+cd "$REPO_ROOT"
+echo "pre-push: scanning tracked files against $(basename "$POLICY")"
 
-if ! PYTHONPATH="$CONTENT_GUARD_DIR/src" python3 -m content_guard scan "$REPO_ROOT" --policy "$POLICY"; then
+if ! PYTHONPATH="$CONTENT_GUARD_DIR/src" python3 -m content_guard.git_scan --all-tracked --policy "$POLICY"; then
   echo >&2
-  echo "pre-push: BLOCKED. content-guard found violations." >&2
-  echo "pre-push: fix the leak, or add an inline tag on the offending line:" >&2
-  echo "pre-push:   <!-- content-guard: allow <rule-id> -->" >&2
+  echo "pre-push: BLOCKED. content-guard found violations in tracked files." >&2
+  echo "pre-push:" >&2
+  echo "pre-push: To resolve:" >&2
+  echo "pre-push:   1. Fix the leak in the offending file, OR" >&2
+  echo "pre-push:   2. Add an inline allow tag on the offending line:" >&2
+  echo "pre-push:        <!-- content-guard: allow <rule-id> -->" >&2
+  echo "pre-push:      or for the whole file (add near the top):" >&2
+  echo "pre-push:        <!-- content-guard: allow <rule-id> file -->" >&2
+  echo "pre-push:" >&2
+  echo "pre-push: Bypass only if you know what you are doing: git push --no-verify" >&2
   exit 1
 fi

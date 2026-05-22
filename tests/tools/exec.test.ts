@@ -1,3 +1,4 @@
+// content-guard: allow private-ipv4 file
 import { describe, it, expect, afterEach, vi } from "vitest";
 import { startFakeProxmox, FakeProxmox } from "../fake-proxmox.ts";
 import { ProxmoxClient } from "../../src/proxmox-client.ts";

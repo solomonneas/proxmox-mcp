@@ -1,3 +1,4 @@
+<!-- content-guard: allow private-ipv4 file -->
 # proxmox-mcp Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: superpowers:subagent-driven-development (implementer-only, opus-4-7). Steps use `- [ ]` checkboxes.
