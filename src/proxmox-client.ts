@@ -1,4 +1,4 @@
-import { Agent as UndiciAgent } from "undici";
+import { request as httpsRequest } from "node:https";
 
 export interface ProxmoxClientOptions {
   retryDelayMs?: number;
@@ -28,17 +28,12 @@ export interface ClientInstanceConfig {
 export class ProxmoxClient {
   private authHeader: string;
   private retryDelayMs: number;
-  // Node's global fetch (undici) ignores node:https.Agent. To actually skip
-  // cert verification for self-signed PVE hosts we pass an undici Agent via
-  // the `dispatcher` init option.
-  dispatcher?: UndiciAgent;
+  usesInsecureTls: boolean;
 
   constructor(private cfg: ClientInstanceConfig, opts: ProxmoxClientOptions = {}) {
     this.authHeader = `PVEAPIToken=${cfg.tokenId}=${cfg.tokenSecret}`;
     this.retryDelayMs = opts.retryDelayMs ?? 1000;
-    if (cfg.tlsInsecure && cfg.url.startsWith("https://")) {
-      this.dispatcher = new UndiciAgent({ connect: { rejectUnauthorized: false } });
-    }
+    this.usesInsecureTls = cfg.tlsInsecure && cfg.url.startsWith("https://");
   }
 
   async get<T = unknown>(path: string): Promise<T> {
@@ -75,9 +70,7 @@ export class ProxmoxClient {
     let lastErr: unknown;
     for (let attempt = 0; attempt < 2; attempt++) {
       try {
-        const init: Record<string, unknown> = { method, headers, body: bodyStr };
-        if (this.dispatcher) init.dispatcher = this.dispatcher;
-        const res = await fetch(url, init as RequestInit);
+        const res = await this.fetchUrl(url, method, headers, bodyStr);
         if (res.status >= 200 && res.status < 300) {
           const text = await res.text();
           if (!text) return undefined as T;
@@ -101,6 +94,48 @@ export class ProxmoxClient {
     }
     throw lastErr ?? new ProxmoxUnreachableError("unknown");
   }
+
+  private async fetchUrl(
+    url: string,
+    method: string,
+    headers: Record<string, string>,
+    body?: string,
+  ): Promise<{ status: number; text(): Promise<string> }> {
+    if (!this.usesInsecureTls) {
+      return fetch(url, { method, headers, body });
+    }
+    return nodeRequest(url, method, headers, body, false);
+  }
 }
 
 function sleep(ms: number) { return new Promise<void>((r) => setTimeout(r, ms)); }
+
+function nodeRequest(
+  url: string,
+  method: string,
+  headers: Record<string, string>,
+  body: string | undefined,
+  rejectUnauthorized: boolean,
+): Promise<{ status: number; text(): Promise<string> }> {
+  return new Promise((resolve, reject) => {
+    const parsed = new URL(url);
+    const req = httpsRequest(
+      parsed,
+      { method, headers, rejectUnauthorized },
+      (res) => {
+        const chunks: Buffer[] = [];
+        res.on("data", (chunk: Buffer) => chunks.push(chunk));
+        res.on("end", () => {
+          const text = Buffer.concat(chunks).toString("utf8");
+          resolve({
+            status: res.statusCode ?? 0,
+            text: async () => text,
+          });
+        });
+      },
+    );
+    req.on("error", reject);
+    if (body !== undefined) req.write(body);
+    req.end();
+  });
+}

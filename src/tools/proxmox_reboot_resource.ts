@@ -1,6 +1,6 @@
 import { Type } from "@sinclair/typebox";
 import type { ClientFactory } from "./_util.ts";
-import { jsonToolResult, resolveResource } from "./_util.ts";
+import { jsonToolResult, resolveResource, validateToolArgs } from "./_util.ts";
 import { assertConfirmedWrite } from "../gates.ts";
 
 const Schema = Type.Object(
@@ -24,7 +24,7 @@ export function createProxmoxRebootResourceTool(getClient: ClientFactory) {
     parameters: Schema,
     execute: async (_id: string, raw: Record<string, unknown>) => {
       assertConfirmedWrite(raw, NAME);
-      const args = raw as { vmid: number };
+      const args = validateToolArgs<{ vmid: number; confirm: boolean }>(Schema, raw, NAME);
       const client = getClient();
       const { node, type } = await resolveResource(client, args.vmid);
       const upid = await client.post<string>(

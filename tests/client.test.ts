@@ -67,19 +67,19 @@ describe("ProxmoxClient", () => {
     expect(parsed.get("vmstate")).toBe("0");
   });
 
-  it("sets undici dispatcher when tlsInsecure:true on https url", () => {
+  it("uses insecure TLS fallback when tlsInsecure:true on https url", () => {
     const c = new ProxmoxClient({ url: "https://pve.example:8006", tokenId: "u@pam!t", tokenSecret: "s", tlsInsecure: true });
-    expect(c.dispatcher).toBeDefined();
+    expect(c.usesInsecureTls).toBe(true);
   });
 
-  it("does not set dispatcher when tlsInsecure:false", () => {
+  it("does not use insecure TLS fallback when tlsInsecure:false", () => {
     const c = new ProxmoxClient({ url: "https://pve.example:8006", tokenId: "u@pam!t", tokenSecret: "s", tlsInsecure: false });
-    expect(c.dispatcher).toBeUndefined();
+    expect(c.usesInsecureTls).toBe(false);
   });
 
-  it("does not set dispatcher for http:// even when tlsInsecure:true", () => {
+  it("does not use insecure TLS fallback for http:// even when tlsInsecure:true", () => {
     const c = new ProxmoxClient({ url: "http://pve.example:8006", tokenId: "u@pam!t", tokenSecret: "s", tlsInsecure: true });
-    expect(c.dispatcher).toBeUndefined();
+    expect(c.usesInsecureTls).toBe(false);
   });
 
   it("DELETE method uses correct HTTP verb", async () => {

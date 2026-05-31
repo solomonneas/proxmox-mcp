@@ -29,6 +29,13 @@ describe("proxmox_start_resource", () => {
     await expect(tool.execute("test", { vmid: 100 })).rejects.toThrow(WriteGateError);
   });
 
+  it("validates input before resolving resources", async () => {
+    fake = await startFakeProxmox([]);
+    const tool = makeTool();
+    await expect(tool.execute("test", { vmid: "100", confirm: true })).rejects.toThrow(/invalid input/);
+    expect(fake.requests).toHaveLength(0);
+  });
+
   it("posts to status/start for the resolved node+type (lxc)", async () => {
     fake = await startFakeProxmox([
       {

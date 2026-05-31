@@ -1,6 +1,8 @@
 import { Type } from "@sinclair/typebox";
 import type { ClientFactory } from "./_util.ts";
-import { jsonToolResult, parseTaskUpid } from "./_util.ts";
+import { jsonToolResult, parseTaskUpid, validateToolArgs } from "./_util.ts";
+
+const NAME = "proxmox_get_task_status";
 
 const Schema = Type.Object(
   {
@@ -27,13 +29,13 @@ interface TaskStatus {
 
 export function createProxmoxGetTaskStatusTool(getClient: ClientFactory) {
   return {
-    name: "proxmox_get_task_status",
+    name: NAME,
     label: "proxmox: get task status",
     description:
       "Get the current status of a Proxmox task by UPID (running/stopped, exit status) via GET /nodes/{node}/tasks/{upid}/status. Node is parsed from the UPID.",
     parameters: Schema,
     execute: async (_id: string, raw: Record<string, unknown>) => {
-      const args = raw as { upid: string };
+      const args = validateToolArgs<{ upid: string }>(Schema, raw, NAME);
       const { node } = parseTaskUpid(args.upid);
       const client = getClient();
       const status = await client.get<TaskStatus>(

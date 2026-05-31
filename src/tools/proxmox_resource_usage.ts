@@ -1,6 +1,8 @@
 import { Type } from "@sinclair/typebox";
 import type { ClientFactory } from "./_util.ts";
-import { jsonToolResult, resolveResource } from "./_util.ts";
+import { jsonToolResult, resolveResource, validateToolArgs } from "./_util.ts";
+
+const NAME = "proxmox_resource_usage";
 
 const Schema = Type.Object(
   {
@@ -29,13 +31,13 @@ interface RrdSample {
 
 export function createProxmoxResourceUsageTool(getClient: ClientFactory) {
   return {
-    name: "proxmox_resource_usage",
+    name: NAME,
     label: "proxmox: resource usage",
     description:
       "Get historical CPU/memory/disk/network samples for one LXC or VM via GET /nodes/{node}/{type}/{vmid}/rrddata?timeframe=<hour|day|week>.",
     parameters: Schema,
     execute: async (_id: string, raw: Record<string, unknown>) => {
-      const args = raw as { vmid: number; timeframe?: "hour" | "day" | "week" };
+      const args = validateToolArgs<{ vmid: number; timeframe?: "hour" | "day" | "week" }>(Schema, raw, NAME);
       const timeframe = args.timeframe ?? "hour";
       const client = getClient();
       const { node, type } = await resolveResource(client, args.vmid);

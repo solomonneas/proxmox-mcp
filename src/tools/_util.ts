@@ -1,3 +1,5 @@
+import type { TSchema } from "@sinclair/typebox";
+import { Value } from "@sinclair/typebox/value";
 import type { ProxmoxClient } from "../proxmox-client.ts";
 import type { ExecResult, SshHostConfig } from "../ssh-executor.ts";
 
@@ -14,6 +16,25 @@ export function jsonToolResult(payload: unknown) {
   return {
     content: [{ type: "text" as const, text: JSON.stringify(payload, null, 2) }],
   };
+}
+
+export class ToolInputError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ToolInputError";
+  }
+}
+
+export function validateToolArgs<T extends object>(
+  schema: TSchema,
+  raw: Record<string, unknown>,
+  toolName: string,
+): T {
+  if (Value.Check(schema, raw)) return raw as unknown as T;
+  const first = [...Value.Errors(schema, raw)][0];
+  const where = first?.path ? ` at ${first.path}` : "";
+  const message = first?.message ?? "input does not match schema";
+  throw new ToolInputError(`${toolName} invalid input${where}: ${message}`);
 }
 
 export async function resolveResource(

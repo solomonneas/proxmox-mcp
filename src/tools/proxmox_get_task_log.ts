@@ -1,6 +1,8 @@
 import { Type } from "@sinclair/typebox";
 import type { ClientFactory } from "./_util.ts";
-import { jsonToolResult, parseTaskUpid } from "./_util.ts";
+import { jsonToolResult, parseTaskUpid, validateToolArgs } from "./_util.ts";
+
+const NAME = "proxmox_get_task_log";
 
 const Schema = Type.Object(
   {
@@ -29,13 +31,13 @@ interface TaskLogLine {
 
 export function createProxmoxGetTaskLogTool(getClient: ClientFactory) {
   return {
-    name: "proxmox_get_task_log",
+    name: NAME,
     label: "proxmox: get task log",
     description:
       "Tail a Proxmox task log by UPID via GET /nodes/{node}/tasks/{upid}/log?start=N&limit=M. Node is parsed from the UPID. Returns { lines, total }.",
     parameters: Schema,
     execute: async (_id: string, raw: Record<string, unknown>) => {
-      const args = raw as { upid: string; start?: number; limit?: number };
+      const args = validateToolArgs<{ upid: string; start?: number; limit?: number }>(Schema, raw, NAME);
       const { node } = parseTaskUpid(args.upid);
       const start = args.start ?? 0;
       const limit = args.limit ?? 50;

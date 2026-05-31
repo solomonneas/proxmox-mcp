@@ -1,6 +1,6 @@
 import { Type } from "@sinclair/typebox";
 import type { ClientFactory } from "./_util.ts";
-import { jsonToolResult } from "./_util.ts";
+import { jsonToolResult, validateToolArgs } from "./_util.ts";
 import { assertConfirmedWrite } from "../gates.ts";
 
 const Schema = Type.Object(
@@ -64,7 +64,7 @@ export function createProxmoxCreateContainerTool(getClient: ClientFactory) {
     parameters: Schema,
     execute: async (_id: string, raw: Record<string, unknown>) => {
       assertConfirmedWrite(raw, NAME);
-      const args = raw as {
+      const args = validateToolArgs<{
         vmid: number;
         hostname: string;
         ostemplate: string;
@@ -77,7 +77,8 @@ export function createProxmoxCreateContainerTool(getClient: ClientFactory) {
         start?: boolean;
         password?: string;
         ssh_public_keys?: string;
-      };
+        confirm: boolean;
+      }>(Schema, raw, NAME);
       const client = getClient();
       let node = args.node;
       if (!node) {

@@ -1,6 +1,6 @@
 import { Type } from "@sinclair/typebox";
 import type { ClientFactory } from "./_util.ts";
-import { jsonToolResult, resolveResource } from "./_util.ts";
+import { jsonToolResult, resolveResource, validateToolArgs } from "./_util.ts";
 import { assertDestructive, assertEnvFlag } from "../gates.ts";
 
 const Schema = Type.Object(
@@ -28,7 +28,7 @@ export function createProxmoxForceStopResourceTool(getClient: ClientFactory) {
     execute: async (_id: string, raw: Record<string, unknown>) => {
       assertEnvFlag("PROXMOX_ENABLE_DESTRUCTIVE", NAME);
       assertDestructive(raw, NAME);
-      const args = raw as { vmid: number };
+      const args = validateToolArgs<{ vmid: number; confirm: boolean; destructive: boolean }>(Schema, raw, NAME);
       const client = getClient();
       const { node, type } = await resolveResource(client, args.vmid);
       const upid = await client.post<string>(

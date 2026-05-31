@@ -1,6 +1,8 @@
 import { Type } from "@sinclair/typebox";
 import type { ClientFactory } from "./_util.ts";
-import { jsonToolResult } from "./_util.ts";
+import { jsonToolResult, validateToolArgs } from "./_util.ts";
+
+const NAME = "proxmox_recent_tasks";
 
 const Schema = Type.Object(
   {
@@ -28,13 +30,13 @@ interface ClusterTask {
 
 export function createProxmoxRecentTasksTool(getClient: ClientFactory) {
   return {
-    name: "proxmox_recent_tasks",
+    name: NAME,
     label: "proxmox: recent tasks",
     description:
       "List recent cluster tasks (UPID, type, status, node, user, timing) via GET /cluster/tasks. Optionally filter by vmid (post-filter client-side).",
     parameters: Schema,
     execute: async (_id: string, raw: Record<string, unknown>) => {
-      const args = raw as { limit?: number; vmid?: number };
+      const args = validateToolArgs<{ limit?: number; vmid?: number }>(Schema, raw, NAME);
       const limit = args.limit ?? 25;
       const client = getClient();
       const tasks = await client.get<ClusterTask[]>("/cluster/tasks");

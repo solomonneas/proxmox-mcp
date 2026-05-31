@@ -3,6 +3,7 @@ import { startFakeProxmox, FakeProxmox } from "../fake-proxmox.ts";
 import { ProxmoxClient } from "../../src/proxmox-client.ts";
 import { createProxmoxReadFileTool } from "../../src/tools/proxmox_read_file.ts";
 import type { SshExecutor } from "../../src/tools/_util.ts";
+import { WriteGateError } from "../../src/gates.ts";
 
 let fake: FakeProxmox | null = null;
 afterEach(async () => { if (fake) await fake.close(); fake = null; });
@@ -21,7 +22,21 @@ function makeTool(ssh: SshExecutor) {
 }
 
 describe("proxmox_read_file", () => {
-  it("does NOT require confirm (tier-1 read)", async () => {
+  it("refuses without confirm:true", async () => {
+    const ssh: SshExecutor = { execInLxc: vi.fn(), execViaDirectSsh: vi.fn() };
+    await expect(
+      makeTool(ssh).execute("t", { vmid: 109, path: "/etc/hostname" }),
+    ).rejects.toThrow(WriteGateError);
+  });
+
+  it("requires an absolute guest path", async () => {
+    const ssh: SshExecutor = { execInLxc: vi.fn(), execViaDirectSsh: vi.fn() };
+    await expect(
+      makeTool(ssh).execute("t", { vmid: 109, path: "etc/hostname", confirm: true }),
+    ).rejects.toThrow(/path must be absolute/);
+  });
+
+  it("reads a file when confirm:true is supplied", async () => {
     fake = await startFakeProxmox([
       {
         method: "GET",
@@ -34,7 +49,7 @@ describe("proxmox_read_file", () => {
       execInLxc: vi.fn(async () => ({ stdout: "file content\n", stderr: "", exitCode: 0 })),
       execViaDirectSsh: vi.fn(),
     };
-    const r = await makeTool(ssh).execute("t", { vmid: 109, path: "/etc/hostname" });
+    const r = await makeTool(ssh).execute("t", { vmid: 109, path: "/etc/hostname", confirm: true });
     const payload = JSON.parse(r.content[0].text);
     expect(payload).toEqual({ vmid: 109, path: "/etc/hostname", content: "file content\n" });
   });
@@ -56,7 +71,7 @@ describe("proxmox_read_file", () => {
       }),
       execViaDirectSsh: vi.fn(),
     };
-    await makeTool(ssh).execute("t", { vmid: 109, path: "/etc/hostname" });
+    await makeTool(ssh).execute("t", { vmid: 109, path: "/etc/hostname", confirm: true });
     expect(captured).toBe("cat -- '/etc/hostname'");
   });
 
@@ -74,7 +89,7 @@ describe("proxmox_read_file", () => {
       execInLxc: vi.fn(async (_vmid, cmd) => { captured = cmd; return { stdout: "x", stderr: "", exitCode: 0 }; }),
       execViaDirectSsh: vi.fn(),
     };
-    await makeTool(ssh).execute("t", { vmid: 109, path: "/tmp/a'b" });
+    await makeTool(ssh).execute("t", { vmid: 109, path: "/tmp/a'b", confirm: true });
     // Single-quote escape: 'a'\''b' inside single-quoted wrapping.
     expect(captured).toBe("cat -- '/tmp/a'\\''b'");
   });
@@ -97,7 +112,7 @@ describe("proxmox_read_file", () => {
       execViaDirectSsh: vi.fn(),
     };
     await expect(
-      makeTool(ssh).execute("t", { vmid: 109, path: "/missing" }),
+      makeTool(ssh).execute("t", { vmid: 109, path: "/missing", confirm: true }),
     ).rejects.toThrow(/No such file or directory/);
   });
 });

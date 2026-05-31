@@ -50,6 +50,7 @@ const HOST_CFG = { host: "192.0.2.10", port: 22, user: "claude", keyPath: "~/.ss
 beforeEach(() => {
   lastClient.current = null;
   vi.clearAllMocks();
+  delete process.env.PROXMOX_SSH_MAX_OUTPUT_BYTES;
 });
 
 function drive(stdout: string, stderr: string, exitCode: number) {
@@ -111,6 +112,12 @@ describe("ssh-executor", () => {
       await expect(
         execInLxc({ ...HOST_CFG, keyPath: "~/.ssh/missing" }, 109, "echo x", 5000),
       ).rejects.toThrow(/key file not found/i);
+    });
+
+    it("rejects when stdout exceeds the configured output cap", async () => {
+      process.env.PROXMOX_SSH_MAX_OUTPUT_BYTES = "1024";
+      drive("x".repeat(1025), "", 0);
+      await expect(execInLxc(HOST_CFG, 109, "cat /large", 5000)).rejects.toThrow(/stdout exceeded 1024 bytes/);
     });
   });
 

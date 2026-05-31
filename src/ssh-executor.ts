@@ -16,6 +16,7 @@ export interface ExecResult {
 }
 
 export type SshExecPhase = "connect" | "exec" | "timeout";
+const DEFAULT_MAX_OUTPUT_BYTES = 1024 * 1024;
 
 export class SshExecError extends Error {
   constructor(public phase: SshExecPhase, message: string) {
@@ -56,6 +57,14 @@ function buildDirectCommand(command: string): string {
   return `bash -c "$(echo ${b64} | base64 -d)"`;
 }
 
+function resolveMaxOutputBytes(): number {
+  const raw = process.env.PROXMOX_SSH_MAX_OUTPUT_BYTES;
+  if (!raw) return DEFAULT_MAX_OUTPUT_BYTES;
+  const parsed = Number.parseInt(raw, 10);
+  if (!Number.isFinite(parsed) || parsed < 1024) return DEFAULT_MAX_OUTPUT_BYTES;
+  return parsed;
+}
+
 async function runOverSsh(
   cfg: SshHostConfig,
   remoteCommand: string,
@@ -63,10 +72,13 @@ async function runOverSsh(
   stdin?: string,
 ): Promise<ExecResult> {
   const key = await loadKey(cfg.keyPath);
+  const maxOutputBytes = resolveMaxOutputBytes();
   return new Promise<ExecResult>((resolve, reject) => {
     const conn = new Client();
     let stdout = "";
     let stderr = "";
+    let stdoutBytes = 0;
+    let stderrBytes = 0;
     let settled = false;
 
     const timer = setTimeout(() => {
@@ -90,7 +102,27 @@ async function runOverSsh(
       settled = true;
       clearTimeout(timer);
       try { conn.end(); } catch {}
+      try { conn.destroy(); } catch {}
       reject(new SshExecError(phase, message));
+    };
+
+    const appendOutput = (streamName: "stdout" | "stderr", chunk: Buffer) => {
+      if (settled) return;
+      if (streamName === "stdout") {
+        stdoutBytes += chunk.length;
+        if (stdoutBytes > maxOutputBytes) {
+          fail("exec", `stdout exceeded ${maxOutputBytes} bytes`);
+          return;
+        }
+        stdout += chunk.toString("utf8");
+        return;
+      }
+      stderrBytes += chunk.length;
+      if (stderrBytes > maxOutputBytes) {
+        fail("exec", `stderr exceeded ${maxOutputBytes} bytes`);
+        return;
+      }
+      stderr += chunk.toString("utf8");
     };
 
     conn.on("error", (err: Error) => fail("connect", err.message));
@@ -99,10 +131,10 @@ async function runOverSsh(
       conn.exec(remoteCommand, (err, stream) => {
         if (err) return fail("exec", err.message);
         stream.on("data", (chunk: Buffer) => {
-          stdout += chunk.toString("utf8");
+          appendOutput("stdout", chunk);
         });
         stream.stderr.on("data", (chunk: Buffer) => {
-          stderr += chunk.toString("utf8");
+          appendOutput("stderr", chunk);
         });
         stream.on("close", (code: number | null) => {
           finish({ stdout, stderr, exitCode: code ?? -1 });

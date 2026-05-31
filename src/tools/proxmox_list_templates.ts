@@ -1,6 +1,8 @@
 import { Type } from "@sinclair/typebox";
 import type { ClientFactory } from "./_util.ts";
-import { jsonToolResult } from "./_util.ts";
+import { jsonToolResult, validateToolArgs } from "./_util.ts";
+
+const NAME = "proxmox_list_templates";
 
 const Schema = Type.Object(
   {
@@ -37,13 +39,13 @@ type Kind = "vztmpl" | "iso" | "both";
 
 export function createProxmoxListTemplatesTool(getClient: ClientFactory) {
   return {
-    name: "proxmox_list_templates",
+    name: NAME,
     label: "proxmox: list templates",
     description:
       "List available LXC container templates (vztmpl) and/or VM ISOs on a node/storage (GET /nodes/{node}/storage/{storage}/content?content=vztmpl|iso). Defaults to both kinds on storage 'local'.",
     parameters: Schema,
     execute: async (_id: string, raw: Record<string, unknown>) => {
-      const args = raw as { node?: string; storage?: string; kind?: Kind };
+      const args = validateToolArgs<{ node?: string; storage?: string; kind?: Kind }>(Schema, raw, NAME);
       const client = getClient();
       let node = args.node;
       if (!node) {

@@ -1,6 +1,8 @@
 import { Type } from "@sinclair/typebox";
 import type { ClientFactory } from "./_util.ts";
-import { jsonToolResult } from "./_util.ts";
+import { jsonToolResult, validateToolArgs } from "./_util.ts";
+
+const NAME = "proxmox_list_backups";
 
 const Schema = Type.Object(
   {
@@ -38,13 +40,13 @@ interface BackupEntry {
 
 export function createProxmoxListBackupsTool(getClient: ClientFactory) {
   return {
-    name: "proxmox_list_backups",
+    name: NAME,
     label: "proxmox: list backups",
     description:
       "List backup volumes on a node. Walks each backup-capable storage via GET /nodes/{node}/storage/{storage}/content?content=backup. Optionally filter by vmid.",
     parameters: Schema,
     execute: async (_id: string, raw: Record<string, unknown>) => {
-      const args = raw as { node?: string; vmid?: number };
+      const args = validateToolArgs<{ node?: string; vmid?: number }>(Schema, raw, NAME);
       const client = getClient();
       let node = args.node;
       if (!node) {

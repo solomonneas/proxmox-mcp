@@ -31,6 +31,13 @@ describe("proxmox_write_file", () => {
     ).rejects.toThrow(WriteGateError);
   });
 
+  it("requires an absolute guest path", async () => {
+    const ssh: SshExecutor = { execInLxc: vi.fn(), execViaDirectSsh: vi.fn() };
+    await expect(
+      makeTool(ssh).execute("t", { vmid: 109, path: "tmp/x", content: "hi", confirm: true }),
+    ).rejects.toThrow(/path must be absolute/);
+  });
+
   it("mkdir -p then cat > <path> with content piped on stdin (LXC)", async () => {
     fake = await startFakeProxmox([
       {
