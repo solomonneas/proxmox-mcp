@@ -37,6 +37,7 @@ PRIVS=(
   Sys.Audit
   VM.Allocate
   VM.Audit
+  VM.Backup
   VM.Clone
   VM.Config.CDROM
   VM.Config.CPU
@@ -50,6 +51,7 @@ PRIVS=(
   VM.GuestAgent.Audit
   VM.PowerMgmt
   VM.Snapshot
+  VM.Snapshot.Rollback
 )
 PRIVS_CSV="$(IFS=,; echo "${PRIVS[*]}")"
 

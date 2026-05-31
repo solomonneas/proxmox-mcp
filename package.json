@@ -1,6 +1,6 @@
 {
   "name": "@solomonneas/proxmox-mcp",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "MCP server exposing Proxmox VE read + safe-write tools (incl. in-container exec)",
   "type": "module",
   "openclaw": {

@@ -7,6 +7,7 @@ import { execInLxc, execViaDirectSsh } from "./src/ssh-executor.ts";
 import { registerSecret, redact } from "./src/security.ts";
 import type { SshExecutor } from "./src/tools/_util.ts";
 import * as toolFactories from "./src/tools/index.ts";
+import { classifyToolError } from "./src/errors.ts";
 
 const cfg: ProxmoxConfig = resolveConfig(process.env);
 registerSecret(cfg.tokenId);
@@ -35,6 +36,7 @@ const tools = [
   toolFactories.createProxmoxGetVmConfigTool(getClient),
   toolFactories.createProxmoxGetContainerConfigTool(getClient),
   toolFactories.createProxmoxValidateQemuSmokeSourceTool(getClient),
+  toolFactories.createProxmoxAuditPermissionsTool(getClient),
   toolFactories.createProxmoxRecentTasksTool(getClient),
   toolFactories.createProxmoxListBackupsTool(getClient),
   toolFactories.createProxmoxResourceUsageTool(getClient),
@@ -42,6 +44,7 @@ const tools = [
   toolFactories.createProxmoxStopResourceTool(getClient),
   toolFactories.createProxmoxRebootResourceTool(getClient),
   toolFactories.createProxmoxSnapshotResourceTool(getClient),
+  toolFactories.createProxmoxRollbackSnapshotTool(getClient),
   toolFactories.createProxmoxRunBackupTool(getClient),
   toolFactories.createProxmoxGetTaskStatusTool(getClient),
   toolFactories.createProxmoxGetTaskLogTool(getClient),
@@ -72,7 +75,7 @@ const tools = [
 
 const toolMap = new Map(tools.map((t) => [t.name, t]));
 
-const server = new Server({ name: "proxmox-mcp", version: "0.4.0" }, { capabilities: { tools: {} } });
+const server = new Server({ name: "proxmox-mcp", version: "0.5.0" }, { capabilities: { tools: {} } });
 
 server.setRequestHandler(ListToolsRequestSchema, async () => ({
   tools: tools.map((t) => ({ name: t.name, description: t.description, inputSchema: t.parameters })),
@@ -81,13 +84,23 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
 server.setRequestHandler(CallToolRequestSchema, async (req) => {
   const t = toolMap.get(req.params.name);
   if (!t) {
-    return { content: [{ type: "text", text: JSON.stringify({ error: `unknown tool: ${req.params.name}` }) }], isError: true };
+    return {
+      content: [{
+        type: "text",
+        text: JSON.stringify({
+          error: `unknown tool: ${req.params.name}`,
+          code: "UNKNOWN_TOOL",
+          name: "UnknownToolError",
+        }),
+      }],
+      isError: true,
+    };
   }
   try {
     return await t.execute(req.params.name, (req.params.arguments ?? {}) as Record<string, unknown>);
   } catch (e) {
-    const msg = redact((e as Error).message) as string;
-    return { content: [{ type: "text", text: JSON.stringify({ error: msg }) }], isError: true };
+    const payload = redact(classifyToolError(e));
+    return { content: [{ type: "text", text: JSON.stringify(payload) }], isError: true };
   }
 });
 

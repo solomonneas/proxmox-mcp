@@ -6,17 +6,22 @@ import { execInLxc, execViaDirectSsh } from "../src/ssh-executor.ts";
 import {
   createProxmoxCloneResourceTool,
   createProxmoxCreateContainerTool,
+  createProxmoxDeleteSnapshotTool,
   createProxmoxDestroyResourceTool,
   createProxmoxExecTool,
   createProxmoxGetResourceTool,
   createProxmoxGuestNetworkTool,
+  createProxmoxListBackupsTool,
   createProxmoxListStorageTool,
   createProxmoxListTemplatesTool,
   createProxmoxNextVmidTool,
+  createProxmoxRollbackSnapshotTool,
+  createProxmoxRunBackupTool,
   createProxmoxServiceRestartTool,
   createProxmoxServiceStartTool,
   createProxmoxServiceStatusTool,
   createProxmoxServiceStopTool,
+  createProxmoxSnapshotResourceTool,
   createProxmoxStartResourceTool,
   createProxmoxStopResourceTool,
   createProxmoxValidateQemuSmokeSourceTool,
@@ -266,6 +271,127 @@ async function runQemuCloneSmoke(
   }
 }
 
+async function runBackupSmoke(getClient: () => ProxmoxClient, vmid: number) {
+  if (process.env.PROXMOX_SMOKE_BACKUP !== "1") return false;
+  const storage = process.env.PROXMOX_SMOKE_BACKUP_STORAGE ?? "local";
+  const mode = process.env.PROXMOX_SMOKE_BACKUP_MODE ?? "snapshot";
+  if (!["snapshot", "suspend", "stop"].includes(mode)) {
+    throw new Error("PROXMOX_SMOKE_BACKUP_MODE must be snapshot, suspend, or stop");
+  }
+  const backup = parseTool<{ upid: string }>(
+    await createProxmoxRunBackupTool(getClient).execute("smoke", {
+      vmid,
+      storage,
+      mode,
+      confirm: true,
+    }),
+  );
+  log({ step: "backup", vmid, storage, mode, upid: backup.upid });
+  if (!(await waitOk(getClient, backup.upid, "backup_wait"))) throw new Error("Backup task did not finish OK.");
+  const backups = parseTool<{ count: number; backups: unknown[] }>(
+    await createProxmoxListBackupsTool(getClient).execute("smoke", { vmid }),
+  );
+  log({ step: "backup_list", vmid, count: backups.count });
+  if (backups.count === 0) throw new Error(`Backup completed but no backup artifact was listed for vmid ${vmid}`);
+  return true;
+}
+
+async function runSnapshotRollbackSmoke(
+  getClient: () => ProxmoxClient,
+  getSsh: () => SshExecutor,
+  vmDefaults: { vmUser: string; vmKeyPath: string },
+  vmid: number,
+) {
+  if (process.env.PROXMOX_SMOKE_SNAPSHOT_ROLLBACK !== "1") return false;
+  const snapname = `mcp_smoke_${Date.now()}`;
+  const marker = "/root/mcp-smoke-rollback-marker";
+  let snapCreated = false;
+  let running = true;
+  try {
+    const snapshot = parseTool<{ upid: string }>(
+      await createProxmoxSnapshotResourceTool(getClient).execute("smoke", {
+        vmid,
+        snapname,
+        description: "proxmox-mcp live smoke rollback snapshot",
+        confirm: true,
+      }),
+    );
+    snapCreated = true;
+    log({ step: "snapshot", vmid, snapname, upid: snapshot.upid });
+    if (!(await waitOk(getClient, snapshot.upid, "snapshot_wait"))) throw new Error("Snapshot task did not finish OK.");
+
+    const writeMarker = parseTool<{ exit_code: number }>(
+      await createProxmoxExecTool(getClient, getSsh, vmDefaults).execute("smoke", {
+        vmid,
+        command: `printf rollback-smoke > ${marker}`,
+        confirm: true,
+      }),
+    );
+    if (writeMarker.exit_code !== 0) throw new Error("Rollback marker write failed.");
+    log({ step: "rollback_marker_write", vmid, exit_code: writeMarker.exit_code });
+
+    const stop = parseTool<{ upid: string }>(
+      await createProxmoxStopResourceTool(getClient).execute("smoke", { vmid, timeoutSeconds: 30, confirm: true }),
+    );
+    log({ step: "rollback_stop", vmid, upid: stop.upid });
+    await waitOk(getClient, stop.upid, "rollback_stop_wait");
+
+    const rollback = parseTool<{ upid: string }>(
+      await createProxmoxRollbackSnapshotTool(getClient).execute("smoke", {
+        vmid,
+        snapname,
+        start: false,
+        confirm: true,
+        destructive: true,
+      }),
+    );
+    log({ step: "rollback", vmid, snapname, upid: rollback.upid });
+    if (!(await waitOk(getClient, rollback.upid, "rollback_wait"))) throw new Error("Rollback task did not finish OK.");
+    running = false;
+
+    const restart = parseTool<{ upid: string }>(
+      await createProxmoxStartResourceTool(getClient).execute("smoke", { vmid, confirm: true }),
+    );
+    log({ step: "rollback_start", vmid, upid: restart.upid });
+    if (!(await waitOk(getClient, restart.upid, "rollback_start_wait"))) throw new Error("Rollback restart task did not finish OK.");
+    running = true;
+
+    const verifyMarker = parseTool<{ exit_code: number }>(
+      await createProxmoxExecTool(getClient, getSsh, vmDefaults).execute("smoke", {
+        vmid,
+        command: `test ! -e ${marker}`,
+        confirm: true,
+      }),
+    );
+    log({ step: "rollback_verify", vmid, exit_code: verifyMarker.exit_code });
+    if (verifyMarker.exit_code !== 0) throw new Error("Rollback marker still exists after snapshot rollback.");
+    return true;
+  } finally {
+    if (snapCreated) {
+      if (running) {
+        const stop = parseTool<{ upid: string }>(
+          await createProxmoxStopResourceTool(getClient).execute("smoke", { vmid, timeoutSeconds: 30, confirm: true }),
+        );
+        log({ step: "snapshot_delete_stop", vmid, upid: stop.upid });
+        await waitOk(getClient, stop.upid, "snapshot_delete_stop_wait");
+        running = false;
+      }
+      const del = parseTool<{ upid: string }>(
+        await createProxmoxDeleteSnapshotTool(getClient).execute("smoke", {
+          vmid,
+          snapname,
+          confirm: true,
+          destructive: true,
+        }),
+      );
+      log({ step: "snapshot_delete", vmid, snapname, upid: del.upid });
+      if (!(await waitOk(getClient, del.upid, "snapshot_delete_wait"))) {
+        throw new Error("Snapshot delete task did not finish OK.");
+      }
+    }
+  }
+}
+
 async function main() {
   if (process.env.PROXMOX_ENABLE_LIVE_SMOKE !== "1") {
     throw new Error("Set PROXMOX_ENABLE_LIVE_SMOKE=1 to run live smoke tests.");
@@ -383,11 +509,28 @@ async function main() {
         log({ step: "service_skipped", vmid, reason: "systemctl not found in scratch CT" });
       }
 
-      const stop = parseTool<{ upid: string }>(
-        await createProxmoxStopResourceTool(getClient).execute("smoke", { vmid, timeoutSeconds: 30, confirm: true }),
+      const ranRollback = await runSnapshotRollbackSmoke(getClient, getSsh, vmDefaults, vmid);
+      if (!ranRollback) {
+        log({ step: "snapshot_rollback_skipped", reason: "set PROXMOX_SMOKE_SNAPSHOT_ROLLBACK=1" });
+      }
+
+      const ranBackup = await runBackupSmoke(getClient, vmid);
+      if (!ranBackup) {
+        log({ step: "backup_skipped", reason: "set PROXMOX_SMOKE_BACKUP=1" });
+      }
+
+      const beforeStop = parseTool<{ status?: { status?: string } }>(
+        await createProxmoxGetResourceTool(getClient).execute("smoke", { vmid }),
       );
-      log({ step: "stop", vmid, upid: stop.upid });
-      await waitOk(getClient, stop.upid, "stop_wait");
+      if (beforeStop.status?.status === "running") {
+        const stop = parseTool<{ upid: string }>(
+          await createProxmoxStopResourceTool(getClient).execute("smoke", { vmid, timeoutSeconds: 30, confirm: true }),
+        );
+        log({ step: "stop", vmid, upid: stop.upid });
+        await waitOk(getClient, stop.upid, "stop_wait");
+      } else {
+        log({ step: "stop_skipped", vmid, status: beforeStop.status?.status });
+      }
     } finally {
       if (created) {
         const destroy = parseTool<{ upid: string }>(
