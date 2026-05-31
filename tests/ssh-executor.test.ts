@@ -73,14 +73,14 @@ function drive(stdout: string, stderr: string, exitCode: number) {
 
 describe("ssh-executor", () => {
   describe("execInLxc", () => {
-    it("wraps the command in `sudo pct exec <vmid> -- bash -c` with base64 envelope", async () => {
+    it("wraps the command in `sudo pct exec <vmid> -- sh -c` with base64 envelope", async () => {
       drive("hello\n", "", 0);
       const result = await execInLxc(HOST_CFG, 109, "echo hello", 5000);
       expect(result.stdout).toBe("hello\n");
       expect(result.stderr).toBe("");
       expect(result.exitCode).toBe(0);
       const execCmd = (lastClient.current!.exec as ReturnType<typeof vi.fn>).mock.calls[0][0] as string;
-      expect(execCmd).toMatch(/^sudo pct exec 109 -- bash -c /);
+      expect(execCmd).toMatch(/^sudo pct exec 109 -- sh -c /);
       expect(execCmd).toMatch(/base64 -d/);
       // The user command must NOT appear literally - only the base64 of it.
       expect(execCmd).not.toContain("echo hello");
@@ -133,7 +133,7 @@ describe("ssh-executor", () => {
       expect(result.exitCode).toBe(0);
       const execCmd = (lastClient.current!.exec as ReturnType<typeof vi.fn>).mock.calls[0][0] as string;
       expect(execCmd).not.toContain("sudo pct exec");
-      expect(execCmd).toMatch(/^bash -c /);
+      expect(execCmd).toMatch(/^sh -c /);
       const b64 = Buffer.from("uname -a").toString("base64");
       expect(execCmd).toContain(b64);
     });

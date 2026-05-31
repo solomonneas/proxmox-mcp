@@ -110,6 +110,12 @@ PROXMOX_CREATE_SMOKE_TOKEN=1 bash scripts/create-smoke-token.sh
 
 The script creates or updates role `McpSmokeRole`, pool `mcp-smoke`, user `mcp-smoke@pve`, token `mcp-smoke@pve!live-smoke`, and ACLs for the smoke pool plus `local` and `local-lvm` storage. Proxmox prints the token secret once; store it in your private environment and do not commit it.
 
+Proxmox also checks `/vms/<vmid>` before creating a new CT/VM. For one-off smoke tests, grant the exact next VMID before running the lifecycle smoke:
+
+```bash
+PROXMOX_CREATE_SMOKE_TOKEN=1 PROXMOX_SMOKE_VMID_GRANT=102 bash scripts/create-smoke-token.sh
+```
+
 ## Install
 
 ```

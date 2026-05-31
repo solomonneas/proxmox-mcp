@@ -139,15 +139,27 @@ async function main() {
       }),
     );
     log({ step: "exec", vmid, exit_code: exec.exit_code, stdout: exec.stdout });
+    if (exec.exit_code !== 0) throw new Error(`Guest exec failed with exit code ${exec.exit_code}`);
 
-    const service = parseTool<{ status: Record<string, string> }>(
-      await createProxmoxServiceStatusTool(getClient, getSsh, vmDefaults).execute("smoke", {
+    const hasSystemctl = parseTool<{ exit_code: number }>(
+      await createProxmoxExecTool(getClient, getSsh, vmDefaults).execute("smoke", {
         vmid,
-        service: "basic.target",
+        command: "command -v systemctl >/dev/null 2>&1",
         confirm: true,
       }),
     );
-    log({ step: "service", vmid, active: service.status.ActiveState, load: service.status.LoadState });
+    if (hasSystemctl.exit_code === 0) {
+      const service = parseTool<{ status: Record<string, string> }>(
+        await createProxmoxServiceStatusTool(getClient, getSsh, vmDefaults).execute("smoke", {
+          vmid,
+          service: "basic.target",
+          confirm: true,
+        }),
+      );
+      log({ step: "service", vmid, active: service.status.ActiveState, load: service.status.LoadState });
+    } else {
+      log({ step: "service_skipped", vmid, reason: "systemctl not found in scratch CT" });
+    }
 
     const stop = parseTool<{ upid: string }>(
       await createProxmoxStopResourceTool(getClient).execute("smoke", { vmid, timeoutSeconds: 30, confirm: true }),

@@ -49,12 +49,12 @@ function base64(s: string): string {
 
 function buildLxcCommand(vmid: number, command: string): string {
   const b64 = base64(command);
-  return `sudo pct exec ${vmid} -- bash -c "$(echo ${b64} | base64 -d)"`;
+  return `sudo pct exec ${vmid} -- sh -c "$(echo ${b64} | base64 -d)"`;
 }
 
 function buildDirectCommand(command: string): string {
   const b64 = base64(command);
-  return `bash -c "$(echo ${b64} | base64 -d)"`;
+  return `sh -c "$(echo ${b64} | base64 -d)"`;
 }
 
 function resolveMaxOutputBytes(): number {
