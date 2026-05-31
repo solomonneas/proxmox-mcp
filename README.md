@@ -10,6 +10,9 @@ MCP server exposing Proxmox VE read + gated guest-read + safe-write + destructiv
 | `proxmox_list_containers` | 1 read | LXC inventory across all nodes. |
 | `proxmox_list_vms` | 1 read | QEMU inventory across all nodes. |
 | `proxmox_get_resource` | 1 read | Single container or VM config + status by vmid. |
+| `proxmox_get_vm_config` | 1 read | QEMU VM config by vmid. |
+| `proxmox_get_container_config` | 1 read | LXC container config by vmid. |
+| `proxmox_validate_qemu_smoke_source` | 1 read | Preflight a QEMU VM before live smoke cloning. |
 | `proxmox_recent_tasks` | 1 read | Recent UPID task list per node. |
 | `proxmox_list_backups` | 1 read | Backup inventory by storage. |
 | `proxmox_resource_usage` | 1 read | CPU/mem/disk RRD metrics. |
@@ -29,7 +32,7 @@ MCP server exposing Proxmox VE read + gated guest-read + safe-write + destructiv
 | `proxmox_create_vm` | 2 safe-write | Provision new QEMU VM (`POST /nodes/{node}/qemu`). |
 | `proxmox_clone_resource` | 2 safe-write | Clone existing container or VM into a fresh vmid. |
 | `proxmox_destroy_resource` | 3 destructive | Permanently delete an LXC or VM (`DELETE /nodes/{node}/{type}/{vmid}`). |
-| `proxmox_cleanup_smoke_resources` | 3 destructive | Destroy smoke-prefixed LXC/QEMU guests from a smoke pool. |
+| `proxmox_cleanup_smoke_resources` | 3 destructive | Dry-run or destroy smoke-prefixed LXC/QEMU guests from a smoke pool. |
 | `proxmox_delete_snapshot` | 3 destructive | Delete a named snapshot. |
 | `proxmox_force_stop_resource` | 3 destructive | Non-graceful hard stop of a running container or VM. |
 | `proxmox_get_task_status` | 1 read | Single UPID status lookup. |
@@ -44,7 +47,7 @@ MCP server exposing Proxmox VE read + gated guest-read + safe-write + destructiv
 | `proxmox_service_stop` | 2 safe-write | Stop a systemd service inside a guest. Requires `confirm: true`. |
 | `proxmox_service_restart` | 2 safe-write | Restart a systemd service inside a guest. Requires `confirm: true`. |
 
-**Reads (16):** open; no flags required.
+**Reads (19):** open; no flags required.
 **Gated guest reads (4):** guest file/path/directory/service inspection tools require `confirm: true` because they expose in-guest state through host-backed SSH.
 **Safe writes (13):** require `confirm: true`. Schema documents the gate on every tool. `WriteGateError` fires before any HTTP call.
 **Destructive (4):** require `confirm: true` + `destructive: true` + env `PROXMOX_ENABLE_DESTRUCTIVE=1`. All three gates must be satisfied; any one missing throws `WriteGateError` before resolving the resource.
@@ -129,7 +132,13 @@ PROXMOX_SMOKE_QEMU_SOURCE_VMID=9000 \
 npm run smoke:live
 ```
 
-This full-clones the source VM to a scratch VMID, starts it, checks guest-agent network data, stops it, and destroys it. Use `PROXMOX_SMOKE_QEMU_TARGET_VMID` or `PROXMOX_SMOKE_QEMU_NAME` to override the generated target.
+This validates the source, full-clones it to a scratch VMID, starts it, waits for guest-agent network data, stops it, and destroys it. Use `PROXMOX_SMOKE_QEMU_TARGET_VMID` or `PROXMOX_SMOKE_QEMU_NAME` to override the generated target.
+
+The QEMU source should be a small stopped VM or template with `agent: enabled=1`, DHCP networking, no PCI/USB passthrough, no raw `args`, and a modest disk size. Check it first:
+
+```bash
+# tool: proxmox_validate_qemu_smoke_source { "vmid": 9000 }
+```
 
 Optional systemd service smoke:
 
@@ -148,8 +157,11 @@ Audit or clean leftover smoke resources:
 # Read-only pool audit
 # tool: proxmox_list_pool_resources { "pool": "mcp-smoke" }
 
-# Destructive cleanup, only resources named mcp-smoke-* in the pool are targeted
-# tool: proxmox_cleanup_smoke_resources { "confirm": true, "destructive": true }
+# Dry-run cleanup, only resources named mcp-smoke-* in the pool are targeted
+# tool: proxmox_cleanup_smoke_resources {}
+
+# Actual cleanup waits for delete tasks and skips running guests unless force:true
+# tool: proxmox_cleanup_smoke_resources { "dry_run": false, "confirm": true, "destructive": true }
 ```
 
 ## Install
@@ -250,13 +262,13 @@ PROXMOX_TLS_INSECURE = "false"
 
 This MCP uses the same three-tier write-gating pattern as the rest of the `solomonneas/*-mcp` family:
 
-- **Tier 1 (reads):** open. No confirm flag needed. Status, listings, usage, recent tasks, backup inventory, template inventory, storage inventory, snapshot inventory, guest network lookup, task wait, next-VMID lookup, and pool resource audit live here.
+- **Tier 1 (reads):** open. No confirm flag needed. Status, listings, config inspection, QEMU smoke-source validation, usage, recent tasks, backup inventory, template inventory, storage inventory, snapshot inventory, guest network lookup, task wait, next-VMID lookup, and pool resource audit live here.
 - **Tier 2 (gated guest reads + safe writes):** require an explicit `confirm: true` arg. Guest file/path/directory/service inspection, start, stop, reboot, snapshot create, run backup, create container, create VM, clone, in-container `exec`, in-container `write_file`, and guest service actions live here. A hallucinated tool call without the confirm flag throws `WriteGateError` before any HTTP traffic.
 - **Tier 3 (destructive):** require `confirm: true` + `destructive: true` + the env flag `PROXMOX_ENABLE_DESTRUCTIVE=1` on the MCP process. Permanent resource deletion, smoke pool cleanup, snapshot deletion, and non-graceful force-stop live here.
 
 ### Destructive operations env gate
 
-Tier 3 destructive tools (`proxmox_destroy_resource`, `proxmox_cleanup_smoke_resources`, `proxmox_delete_snapshot`, `proxmox_force_stop_resource`) require an additional safety gate beyond the per-tool `confirm: true` + `destructive: true` args: the env var `PROXMOX_ENABLE_DESTRUCTIVE=1` must be set on the MCP process. Without it, the tools throw `WriteGateError` before any HTTP call is made.
+Tier 3 destructive tools (`proxmox_destroy_resource`, `proxmox_cleanup_smoke_resources`, `proxmox_delete_snapshot`, `proxmox_force_stop_resource`) require an additional safety gate beyond the per-tool `confirm: true` + `destructive: true` args: the env var `PROXMOX_ENABLE_DESTRUCTIVE=1` must be set on the MCP process. Without it, the tools throw `WriteGateError` before any HTTP call is made. `proxmox_cleanup_smoke_resources` defaults to `dry_run:true`, which previews targets without the destructive env gate.
 
 This is intentional: destructive ops are rare. The env flag is a coarse "I am actively doing smoke-test cycles" toggle. Leave it unset day-to-day; flip it only when actively destroying resources is part of the workflow.
 

@@ -14,7 +14,7 @@ const NOOP_SSH: SshExecutor = {
 const VM_DEFAULTS = { vmUser: "root", vmKeyPath: "/k" };
 
 describe("integration", () => {
-  it("all 37 tools register with unique names", () => {
+  it("all 40 tools register with unique names", () => {
     const dummy = () =>
       new ProxmoxClient({ url: "http://x", tokenId: "u@pam!t", tokenSecret: "s", tlsInsecure: false });
     const ssh = () => NOOP_SSH;
@@ -23,6 +23,9 @@ describe("integration", () => {
       toolFactories.createProxmoxListContainersTool(dummy),
       toolFactories.createProxmoxListVmsTool(dummy),
       toolFactories.createProxmoxGetResourceTool(dummy),
+      toolFactories.createProxmoxGetVmConfigTool(dummy),
+      toolFactories.createProxmoxGetContainerConfigTool(dummy),
+      toolFactories.createProxmoxValidateQemuSmokeSourceTool(dummy),
       toolFactories.createProxmoxRecentTasksTool(dummy),
       toolFactories.createProxmoxListBackupsTool(dummy),
       toolFactories.createProxmoxResourceUsageTool(dummy),
@@ -57,9 +60,9 @@ describe("integration", () => {
       toolFactories.createProxmoxServiceStopTool(dummy, ssh, VM_DEFAULTS),
       toolFactories.createProxmoxServiceRestartTool(dummy, ssh, VM_DEFAULTS),
     ];
-    expect(created).toHaveLength(37);
+    expect(created).toHaveLength(40);
     const names = created.map((t) => t.name);
-    expect(new Set(names).size).toBe(37);
+    expect(new Set(names).size).toBe(40);
     for (const n of names) expect(n).toMatch(/^proxmox_/);
   });
 

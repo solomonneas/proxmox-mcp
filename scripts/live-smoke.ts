@@ -19,6 +19,7 @@ import {
   createProxmoxServiceStopTool,
   createProxmoxStartResourceTool,
   createProxmoxStopResourceTool,
+  createProxmoxValidateQemuSmokeSourceTool,
   createProxmoxWaitTaskTool,
 } from "../src/tools/index.ts";
 import type { SshExecutor } from "../src/tools/_util.ts";
@@ -45,6 +46,10 @@ function optionalIntegerEnv(key: string): number | undefined {
   return value;
 }
 
+function sleep(ms: number) {
+  return new Promise<void>((resolve) => setTimeout(resolve, ms));
+}
+
 async function waitOk(getClient: () => ProxmoxClient, upid: string, step: string): Promise<boolean> {
   const waited = parseTool<{ done: boolean; status?: { exitstatus?: string } }>(
     await createProxmoxWaitTaskTool(getClient).execute("smoke", {
@@ -55,6 +60,29 @@ async function waitOk(getClient: () => ProxmoxClient, upid: string, step: string
   );
   log({ step, done: waited.done, exitstatus: waited.status?.exitstatus });
   return waited.done && waited.status?.exitstatus === "OK";
+}
+
+async function waitGuestNetwork(getClient: () => ProxmoxClient, vmid: number, step: string) {
+  const timeoutMs = Number(process.env.PROXMOX_SMOKE_GUEST_NETWORK_TIMEOUT_MS ?? 120_000);
+  const intervalMs = Number(process.env.PROXMOX_SMOKE_GUEST_NETWORK_INTERVAL_MS ?? 2_000);
+  const deadline = Date.now() + timeoutMs;
+  let lastError = "";
+  while (Date.now() <= deadline) {
+    try {
+      const network = parseTool<{ ipv4: unknown[] }>(
+        await createProxmoxGuestNetworkTool(getClient).execute("smoke", { vmid }),
+      );
+      if (network.ipv4.length > 0) {
+        log({ step, vmid, ipv4_count: network.ipv4.length });
+        return network;
+      }
+      lastError = "guest agent returned no IPv4 addresses";
+    } catch (error) {
+      lastError = (error as Error).message;
+    }
+    await sleep(intervalMs);
+  }
+  throw new Error(`Timed out waiting for guest network on vmid ${vmid}: ${lastError}`);
 }
 
 async function grantSmokeVmid(vmid: number) {
@@ -163,6 +191,15 @@ async function runQemuCloneSmoke(
   try {
     await grantSmokeVmid(sourceVmid);
     await grantSmokeVmid(newVmid);
+    const validation = parseTool<{ ok: boolean; blockers: string[]; warnings: string[] }>(
+      await createProxmoxValidateQemuSmokeSourceTool(getClient).execute("smoke", {
+        vmid: sourceVmid,
+        max_disk_gb: Number(process.env.PROXMOX_SMOKE_QEMU_MAX_SOURCE_DISK_GB ?? 64),
+        allow_running: process.env.PROXMOX_SMOKE_QEMU_ALLOW_RUNNING_SOURCE === "1",
+      }),
+    );
+    log({ step: "qemu_source_validation", vmid: sourceVmid, ok: validation.ok, warnings: validation.warnings });
+    if (!validation.ok) throw new Error(`QEMU smoke source validation failed: ${validation.blockers.join("; ")}`);
     const clone = parseTool<{ upid: string }>(
       await createProxmoxCloneResourceTool(getClient).execute("smoke", {
         source_vmid: sourceVmid,
@@ -184,10 +221,7 @@ async function runQemuCloneSmoke(
     log({ step: "qemu_start", vmid: newVmid, upid: start.upid });
     if (!(await waitOk(getClient, start.upid, "qemu_start_wait"))) throw new Error("QEMU start task did not finish OK.");
 
-    const network = parseTool<{ ipv4: unknown[] }>(
-      await createProxmoxGuestNetworkTool(getClient).execute("smoke", { vmid: newVmid }),
-    );
-    log({ step: "qemu_network", vmid: newVmid, ipv4_count: network.ipv4.length });
+    await waitGuestNetwork(getClient, newVmid, "qemu_network");
 
     const stop = parseTool<{ upid: string }>(
       await createProxmoxStopResourceTool(getClient).execute("smoke", {
@@ -200,6 +234,24 @@ async function runQemuCloneSmoke(
     await waitOk(getClient, stop.upid, "qemu_stop_wait");
   } finally {
     if (created) {
+      try {
+        const resource = parseTool<{ status?: { status?: string } }>(
+          await createProxmoxGetResourceTool(getClient).execute("smoke", { vmid: newVmid }),
+        );
+        if (resource.status?.status === "running") {
+          const stop = parseTool<{ upid: string }>(
+            await createProxmoxStopResourceTool(getClient).execute("smoke", {
+              vmid: newVmid,
+              timeoutSeconds: 60,
+              confirm: true,
+            }),
+          );
+          log({ step: "qemu_cleanup_stop", vmid: newVmid, upid: stop.upid });
+          await waitOk(getClient, stop.upid, "qemu_cleanup_stop_wait");
+        }
+      } catch (error) {
+        log({ step: "qemu_cleanup_stop_skipped", vmid: newVmid, reason: (error as Error).message });
+      }
       const destroy = parseTool<{ upid: string }>(
         await createProxmoxDestroyResourceTool(getClient).execute("smoke", {
           vmid: newVmid,
