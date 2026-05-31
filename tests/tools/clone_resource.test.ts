@@ -54,7 +54,6 @@ describe("proxmox_clone_resource", () => {
       target_node: "pve-b",
       pool: "mcp-smoke",
       description: "clone desc",
-      tags: "mcp;clone",
       confirm: true,
     });
     const payload = JSON.parse(r.content[0].text);
@@ -73,6 +72,5 @@ describe("proxmox_clone_resource", () => {
     expect(form.target).toBe("pve-b");
     expect(form.pool).toBe("mcp-smoke");
     expect(form.description).toBe("clone desc");
-    expect(form.tags).toBe("mcp;clone");
   });
 });

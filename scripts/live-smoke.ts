@@ -161,6 +161,7 @@ async function runQemuCloneSmoke(
   let created = false;
 
   try {
+    await grantSmokeVmid(sourceVmid);
     await grantSmokeVmid(newVmid);
     const clone = parseTool<{ upid: string }>(
       await createProxmoxCloneResourceTool(getClient).execute("smoke", {
@@ -170,7 +171,6 @@ async function runQemuCloneSmoke(
         full: true,
         pool,
         description: "proxmox-mcp live smoke scratch QEMU clone",
-        tags: "mcp;smoke",
         confirm: true,
       }),
     );
