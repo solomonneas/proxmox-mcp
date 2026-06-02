@@ -105,4 +105,18 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
 });
 
 const transport = new StdioServerTransport();
+  // Strip the draft-07 `$schema` the MCP SDK stamps on tool schemas; Anthropic
+  // rejects it ("must match JSON Schema draft 2020-12") when the full tool set
+  // is sent, e.g. on subagent spawns. Intercept tools/list output here.
+  const __send = transport.send.bind(transport);
+  (transport as any).send = (message: any) => {
+    const tools = message?.result?.tools;
+    if (Array.isArray(tools)) {
+      for (const t of tools) {
+        if (t?.inputSchema) delete t.inputSchema.$schema;
+        if (t?.outputSchema) delete t.outputSchema.$schema;
+      }
+    }
+    return __send(message);
+  };
 await server.connect(transport);
