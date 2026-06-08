@@ -2,6 +2,7 @@ import { Type } from "@sinclair/typebox";
 import type { ClientFactory } from "./_util.ts";
 import { jsonToolResult, validateToolArgs } from "./_util.ts";
 import { assertConfirmedWrite } from "../gates.ts";
+import { registerSecret } from "../security.ts";
 
 const Schema = Type.Object(
   {
@@ -107,6 +108,9 @@ export function createProxmoxCreateContainerTool(getClient: ClientFactory) {
         ssh_public_keys?: string;
         confirm: boolean;
       }>(Schema, raw, NAME);
+      if (typeof args.password === "string" && args.password.length > 0) {
+        registerSecret(args.password);
+      }
       const client = getClient();
       let node = args.node;
       if (!node) {

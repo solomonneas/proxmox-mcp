@@ -1,6 +1,6 @@
 import { Type } from "@sinclair/typebox";
 import type { ClientFactory } from "./_util.ts";
-import { jsonToolResult, validateToolArgs } from "./_util.ts";
+import { assertSafePathSegment, jsonToolResult, validateToolArgs } from "./_util.ts";
 
 const NAME = "proxmox_list_templates";
 
@@ -55,18 +55,22 @@ export function createProxmoxListTemplatesTool(getClient: ClientFactory) {
       }
       const storage = args.storage ?? "local";
       const kind: Kind = args.kind ?? "both";
+      assertSafePathSegment(node, "node");
+      assertSafePathSegment(storage, "storage");
+      const nodeSeg = encodeURIComponent(node);
+      const storageSeg = encodeURIComponent(storage);
       const out: { node: string; storage: string; container_templates?: ContentEntry[]; vm_isos?: ContentEntry[] } = {
         node,
         storage,
       };
       if (kind === "vztmpl" || kind === "both") {
         out.container_templates = await client.get<ContentEntry[]>(
-          `/nodes/${node}/storage/${storage}/content?content=vztmpl`,
+          `/nodes/${nodeSeg}/storage/${storageSeg}/content?content=vztmpl`,
         );
       }
       if (kind === "iso" || kind === "both") {
         out.vm_isos = await client.get<ContentEntry[]>(
-          `/nodes/${node}/storage/${storage}/content?content=iso`,
+          `/nodes/${nodeSeg}/storage/${storageSeg}/content?content=iso`,
         );
       }
       return jsonToolResult(out);

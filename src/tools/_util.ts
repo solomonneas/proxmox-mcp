@@ -37,6 +37,20 @@ export function validateToolArgs<T extends object>(
   throw new ToolInputError(`${toolName} invalid input${where}: ${message}`);
 }
 
+// Proxmox node/storage/pool identifiers are restricted to a conservative
+// charset. Validating tool-supplied segments before they are interpolated into
+// an API request path blocks request-path injection (slashes, '?', '#', '..').
+const SAFE_SEGMENT_RE = /^[\w.-]+$/;
+
+export function assertSafePathSegment(value: string, label: string): string {
+  if (!SAFE_SEGMENT_RE.test(value)) {
+    throw new ToolInputError(
+      `invalid ${label} "${value}": expected only letters, digits, '_', '.', or '-'`,
+    );
+  }
+  return value;
+}
+
 export async function resolveResource(
   client: ProxmoxClient,
   vmid: number,

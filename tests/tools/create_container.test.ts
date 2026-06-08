@@ -3,6 +3,7 @@ import { startFakeProxmox, FakeProxmox } from "../fake-proxmox.ts";
 import { ProxmoxClient } from "../../src/proxmox-client.ts";
 import { createProxmoxCreateContainerTool } from "../../src/tools/proxmox_create_container.ts";
 import { WriteGateError } from "../../src/gates.ts";
+import { redact } from "../../src/security.ts";
 
 let fake: FakeProxmox | null = null;
 afterEach(async () => {
@@ -108,5 +109,33 @@ describe("proxmox_create_container", () => {
     expect(form.features).toBe("nesting=1");
     expect(form.description).toBe("scratch ct");
     expect(form.tags).toBe("mcp;smoke");
+  });
+
+  it("registers the root password as a secret so it is redacted from output", async () => {
+    fake = await startFakeProxmox([
+      {
+        method: "POST",
+        path: "/api2/json/nodes/pve/lxc",
+        status: 200,
+        body: { data: "UPID:pve:00010:lxc-create" },
+      },
+    ]);
+    const tool = makeTool();
+    const secret = "s3cr3t-ct-pw-unique";
+    await tool.execute("test", {
+      vmid: 202,
+      hostname: "ct-pw",
+      ostemplate: "local:vztmpl/debian.tar.zst",
+      node: "pve",
+      password: secret,
+      confirm: true,
+    });
+    // The password was still sent to Proxmox...
+    const postReq = fake.requests.find((q) => q.method === "POST");
+    const form = Object.fromEntries(new URLSearchParams(postReq?.body ?? ""));
+    expect(form.password).toBe(secret);
+    // ...but is now a registered secret, so any later redact() masks it.
+    expect(redact(`password: ${secret}`)).toContain("REDACTED");
+    expect(redact(`password: ${secret}`)).not.toContain(secret);
   });
 });

@@ -16,6 +16,32 @@ const Schema = Type.Object(
 
 const NAME = "proxmox_stat_path";
 
+function parseStatOutput(stdout: string): {
+  file_type: string;
+  size: number;
+  owner: string;
+  group: string;
+  mode: string;
+  mtime: number;
+  name: string;
+} {
+  const fields = stdout.split("\0");
+  if (fields.at(-1) === "") fields.pop();
+  if (fields.length !== 7) {
+    throw new Error(`${NAME} unexpected stat output: expected 7 NUL-delimited fields, got ${fields.length}`);
+  }
+  const [file_type, size, owner, group, mode, mtime, name] = fields;
+  return {
+    file_type,
+    size: Number(size),
+    owner,
+    group,
+    mode,
+    mtime: Number(mtime),
+    name,
+  };
+}
+
 export function createProxmoxStatPathTool(
   getClient: ClientFactory,
   getSsh: SshExecutorFactory,
@@ -31,7 +57,7 @@ export function createProxmoxStatPathTool(
       assertConfirmedWrite(raw, NAME);
       const args = validateToolArgs<{ vmid: number; path: string; confirm: boolean }>(Schema, raw, NAME);
       assertAbsoluteGuestPath(args.path, NAME);
-      const command = `stat -Lc '%F|%s|%U|%G|%a|%Y|%n' -- ${shellSingleQuote(args.path)}`;
+      const command = `stat -Lc '%F\\0%s\\0%U\\0%G\\0%a\\0%Y\\0%n\\0' -- ${shellSingleQuote(args.path)}`;
       const { node, type, result } = await runGuestCommand(
         getClient(),
         getSsh(),
@@ -41,19 +67,13 @@ export function createProxmoxStatPathTool(
         30_000,
       );
       if (result.exitCode !== 0) throw new Error(result.stderr.trim() || `stat failed with exit code ${result.exitCode}`);
-      const [file_type, size, owner, group, mode, mtime, name] = result.stdout.trimEnd().split("|");
+      const stat = parseStatOutput(result.stdout);
       return jsonToolResult({
         vmid: args.vmid,
         node,
         type,
         path: args.path,
-        file_type,
-        size: Number(size),
-        owner,
-        group,
-        mode,
-        mtime: Number(mtime),
-        name,
+        ...stat,
       });
     },
   };

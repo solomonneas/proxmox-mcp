@@ -48,4 +48,15 @@ describe("proxmox_audit_permissions", () => {
     expect(payload.paths[0].missing_required).toEqual(["VM.Clone"]);
     expect(payload.paths[1].missing_required).toEqual(["Pool.Audit"]);
   });
+
+  it("rejects pool/storage shortcut args containing unexpected characters", async () => {
+    fake = await startFakeProxmox([]);
+    const tool = makeTool();
+    await expect(tool.execute("test", { pool: "../../../" })).rejects.toThrow(/invalid pool/);
+    await expect(tool.execute("test", { template_storage: "local/evil" })).rejects.toThrow(
+      /invalid template_storage/,
+    );
+    await expect(tool.execute("test", { root_storage: "a b" })).rejects.toThrow(/invalid root_storage/);
+    expect(fake.requests).toHaveLength(0);
+  });
 });

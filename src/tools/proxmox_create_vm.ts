@@ -2,6 +2,7 @@ import { Type } from "@sinclair/typebox";
 import type { ClientFactory } from "./_util.ts";
 import { jsonToolResult, validateToolArgs } from "./_util.ts";
 import { assertConfirmedWrite } from "../gates.ts";
+import { registerSecret } from "../security.ts";
 
 const Schema = Type.Object(
   {
@@ -145,6 +146,9 @@ export function createProxmoxCreateVmTool(getClient: ClientFactory) {
         searchdomain?: string;
         confirm: boolean;
       }>(Schema, raw, NAME);
+      if (typeof args.cipassword === "string" && args.cipassword.length > 0) {
+        registerSecret(args.cipassword);
+      }
       const client = getClient();
       let node = args.node;
       if (!node) {

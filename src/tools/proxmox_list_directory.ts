@@ -23,6 +23,27 @@ interface DirectoryEntry {
   mtime: number;
 }
 
+function parseFindEntries(stdout: string): DirectoryEntry[] {
+  if (stdout === "") return [];
+  const fields = stdout.split("\0");
+  if (fields.at(-1) === "") fields.pop();
+  if (fields.length % 4 !== 0) {
+    throw new Error(`${NAME} unexpected find output: incomplete NUL-delimited record`);
+  }
+
+  const entries: DirectoryEntry[] = [];
+  for (let i = 0; i < fields.length; i += 4) {
+    entries.push({
+      name: fields[i],
+      kind: fields[i + 1],
+      size: Number(fields[i + 2]),
+      mtime: Number(fields[i + 3]),
+    });
+  }
+  entries.sort((a, b) => a.name.localeCompare(b.name));
+  return entries;
+}
+
 export function createProxmoxListDirectoryTool(
   getClient: ClientFactory,
   getSsh: SshExecutorFactory,
@@ -38,7 +59,7 @@ export function createProxmoxListDirectoryTool(
       assertConfirmedWrite(raw, NAME);
       const args = validateToolArgs<{ vmid: number; path: string; confirm: boolean }>(Schema, raw, NAME);
       assertAbsoluteGuestPath(args.path, NAME);
-      const command = `find ${shellSingleQuote(args.path)} -mindepth 1 -maxdepth 1 -printf '%f\\t%y\\t%s\\t%T@\\n' | sort`;
+      const command = `find ${shellSingleQuote(args.path)} -mindepth 1 -maxdepth 1 -printf '%f\\0%y\\0%s\\0%T@\\0'`;
       const { node, type, result } = await runGuestCommand(
         getClient(),
         getSsh(),
@@ -50,12 +71,7 @@ export function createProxmoxListDirectoryTool(
       if (result.exitCode !== 0) {
         throw new Error(result.stderr.trim() || `list_directory failed with exit code ${result.exitCode}`);
       }
-      const entries: DirectoryEntry[] = result.stdout.trimEnd() === ""
-        ? []
-        : result.stdout.trimEnd().split("\n").map((line) => {
-          const [name, kind, size, mtime] = line.split("\t");
-          return { name, kind, size: Number(size), mtime: Number(mtime) };
-        });
+      const entries = parseFindEntries(result.stdout);
       return jsonToolResult({ vmid: args.vmid, node, type, path: args.path, count: entries.length, entries });
     },
   };

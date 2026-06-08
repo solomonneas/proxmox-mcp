@@ -1,6 +1,6 @@
 import { Type } from "@sinclair/typebox";
 import type { ClientFactory } from "./_util.ts";
-import { jsonToolResult, validateToolArgs } from "./_util.ts";
+import { assertSafePathSegment, jsonToolResult, validateToolArgs } from "./_util.ts";
 
 const Schema = Type.Object(
   {
@@ -62,11 +62,14 @@ function defaultPaths(args: {
   source_vmid?: number;
   target_vmid?: number;
 }) {
+  const pool = assertSafePathSegment(args.pool ?? "mcp-smoke", "pool");
+  const templateStorage = assertSafePathSegment(args.template_storage ?? "local", "template_storage");
+  const rootStorage = assertSafePathSegment(args.root_storage ?? "local-lvm", "root_storage");
   const paths = [
     "/",
-    `/pool/${args.pool ?? "mcp-smoke"}`,
-    `/storage/${args.template_storage ?? "local"}`,
-    `/storage/${args.root_storage ?? "local-lvm"}`,
+    `/pool/${pool}`,
+    `/storage/${templateStorage}`,
+    `/storage/${rootStorage}`,
     "/sdn",
   ];
   if (args.source_vmid !== undefined) paths.push(`/vms/${args.source_vmid}`);

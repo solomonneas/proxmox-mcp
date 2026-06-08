@@ -3,6 +3,7 @@ import { startFakeProxmox, FakeProxmox } from "../fake-proxmox.ts";
 import { ProxmoxClient } from "../../src/proxmox-client.ts";
 import { createProxmoxCreateVmTool } from "../../src/tools/proxmox_create_vm.ts";
 import { WriteGateError } from "../../src/gates.ts";
+import { redact } from "../../src/security.ts";
 
 let fake: FakeProxmox | null = null;
 afterEach(async () => {
@@ -120,5 +121,30 @@ describe("proxmox_create_vm", () => {
     expect(form.ipconfig0).toBe("ip=dhcp");
     expect(form.nameserver).toBe("dns.example.test");
     expect(form.searchdomain).toBe("example.test");
+  });
+
+  it("registers the cloud-init password as a secret so it is redacted from output", async () => {
+    fake = await startFakeProxmox([
+      {
+        method: "POST",
+        path: "/api2/json/nodes/pve/qemu",
+        status: 200,
+        body: { data: "UPID:pve:00011:qemu-create" },
+      },
+    ]);
+    const tool = makeTool();
+    const secret = "s3cr3t-vm-pw-unique";
+    await tool.execute("test", {
+      vmid: 302,
+      name: "vm-pw",
+      node: "pve",
+      cipassword: secret,
+      confirm: true,
+    });
+    const postReq = fake.requests.find((q) => q.method === "POST");
+    const form = Object.fromEntries(new URLSearchParams(postReq?.body ?? ""));
+    expect(form.cipassword).toBe(secret);
+    expect(redact(`cipassword: ${secret}`)).toContain("REDACTED");
+    expect(redact(`cipassword: ${secret}`)).not.toContain(secret);
   });
 });

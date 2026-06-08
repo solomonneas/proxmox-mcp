@@ -55,4 +55,25 @@ describe("proxmox_list_templates", () => {
     expect(payload.vm_isos).toHaveLength(1);
     expect(payload.vm_isos[0].volid).toContain(".iso");
   });
+
+  it("rejects node/storage args containing path-injection characters", async () => {
+    fake = await startFakeProxmox([]);
+    const tool = createProxmoxListTemplatesTool(
+      () =>
+        new ProxmoxClient({
+          url: fake!.baseUrl,
+          tokenId: "u@pam!t",
+          tokenSecret: "s",
+          tlsInsecure: false,
+        }),
+    );
+    await expect(tool.execute("test", { node: "pve", storage: "../../access/users" })).rejects.toThrow(
+      /invalid storage/,
+    );
+    await expect(tool.execute("test", { node: "pve/../foo", storage: "local" })).rejects.toThrow(
+      /invalid node/,
+    );
+    // No request should have reached the fake server.
+    expect(fake.requests).toHaveLength(0);
+  });
 });
