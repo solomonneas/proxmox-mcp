@@ -1,13 +1,11 @@
 # Repository Guidance
 
 ## Definition of Done
-A change is complete only when ALL of these pass, run after your final edit:
 ```
-npm run typecheck
-npm test
-npm run build
+./scripts/verify
 ```
-- Any edit after a passing run invalidates that run. Re-run all three.
+It runs `npm run typecheck`, `npm test`, and `npm run build` in order, with tests against the fake Proxmox. A change is complete only when it passes after your final edit.
+- Any edit after a passing run invalidates that run. Re-run it.
 - Report actual results. If anything fails, report the failure verbatim and stop; do not claim success, do not soften the error.
 - `prepublishOnly` runs the same chain; the publish payload is only `dist`, `openclaw.plugin.json`, `README.md`, `LICENSE`.
 

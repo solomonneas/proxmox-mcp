@@ -1,0 +1,11 @@
+#!/bin/bash
+# Single verification entrypoint. AGENTS.md's Definition of Done defers to
+# this file, so the gate lives in exactly one place.
+# Tests run against the in-memory fake Proxmox (tests/fake-proxmox.ts);
+# nothing here touches the live hypervisor or sets live-smoke env flags.
+set -euo pipefail
+cd "$(dirname "$0")/.."
+
+npm run typecheck
+npm test
+npm run build
