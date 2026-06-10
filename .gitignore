@@ -7,3 +7,7 @@ dist/
 .DS_Store
 coverage/
 *.tgz
+
+# Local brigade memory (cards are local-only, never committed)
+/memory/
+.brigade/
